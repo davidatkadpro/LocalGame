@@ -160,6 +160,7 @@ export class PixiGame {
     this.cam.x = (map?.width ?? 32) / 2;
     this.cam.y = (map?.height ?? 32) / 2;
     this.recenterOnStart(me);
+    this.fitInitialZoom();
 
     this.bindInput();
     this.app.ticker.add(() => this.frame());
@@ -259,6 +260,17 @@ export class PixiGame {
   }
 
   // ----------------------------------------------------------- setup helpers
+
+  /** On small screens the default 1× zoom shows only ~10 tiles across, which is
+   *  claustrophobic on a phone. Pull the camera back so the shorter screen axis
+   *  shows ~16 tiles. Desktop/tablet (>=560px min side) keeps the 1× default. */
+  private fitInitialZoom(): void {
+    const dpr = window.devicePixelRatio || 1;
+    const minCss = Math.min(this.app.renderer.width, this.app.renderer.height) / dpr;
+    if (minCss >= 560) return;
+    const z = minCss / (TILE * 16);
+    this.cam.zoom = Math.max(0.45, Math.min(1, z));
+  }
 
   private recenterOnStart(me: number): void {
     const snap = useStore.getState().curr;
@@ -658,12 +670,14 @@ export class PixiGame {
   private drawPlacement(): void {
     const g = this.placeLayer;
     g.clear();
+    // Keep marker strokes ~constant on screen so they stay visible zoomed out.
+    const sw = 0.08 / this.cam.zoom;
     if (this.armedAttack) {
       const { x, y } = this.hoverWorld;
       const col = 0xe03131;
-      g.circle(x, y, 0.5).stroke({ width: 0.08, color: col, alpha: 0.95 });
-      g.moveTo(x - 0.7, y).lineTo(x + 0.7, y).stroke({ width: 0.06, color: col, alpha: 0.95 });
-      g.moveTo(x, y - 0.7).lineTo(x, y + 0.7).stroke({ width: 0.06, color: col, alpha: 0.95 });
+      g.circle(x, y, 0.5).stroke({ width: sw, color: col, alpha: 0.95 });
+      g.moveTo(x - 0.7, y).lineTo(x + 0.7, y).stroke({ width: sw, color: col, alpha: 0.95 });
+      g.moveTo(x, y - 0.7).lineTo(x, y + 0.7).stroke({ width: sw, color: col, alpha: 0.95 });
       return;
     }
     if (!this.placing) return;
@@ -675,7 +689,7 @@ export class PixiGame {
         const col = this.clientPlacementValid("wall", t.x, t.y) ? 0x51cf66 : 0xe03131;
         g.rect(t.x, t.y, 1, 1)
           .fill({ color: col, alpha: 0.25 })
-          .stroke({ width: 0.06, color: col, alpha: 0.9 });
+          .stroke({ width: sw, color: col, alpha: 0.9 });
       }
       return;
     }
@@ -686,7 +700,13 @@ export class PixiGame {
     const col = ok ? 0x51cf66 : 0xe03131;
     g.rect(tx, ty, def.size.w, def.size.h)
       .fill({ color: col, alpha: 0.25 })
-      .stroke({ width: 0.08, color: col, alpha: 0.9 });
+      .stroke({ width: sw, color: col, alpha: 0.9 });
+    // Crosshair at the actual tap point — a finger covers the footprint, so
+    // mark exactly where the placement is anchored.
+    const { x: cx, y: cy } = this.hoverWorld;
+    const r = 0.45;
+    g.moveTo(cx - r, cy).lineTo(cx + r, cy).stroke({ width: sw, color: col, alpha: 0.95 });
+    g.moveTo(cx, cy - r).lineTo(cx, cy + r).stroke({ width: sw, color: col, alpha: 0.95 });
   }
 
   /** Mirror of the server's placement rule, using snapshot data, for the ghost. */

@@ -368,8 +368,9 @@ button.cancel {
   /* Top resource bar: pin across the top-left, leave room for the minimap on
      the right, and let it wrap instead of clipping when upgrades appear. */
   .hud-top {
-    left: 8px;
+    left: max(8px, env(safe-area-inset-left));
     right: 124px;
+    top: max(10px, env(safe-area-inset-top));
     transform: none;
     justify-content: flex-start;
     flex-wrap: wrap;
@@ -382,10 +383,13 @@ button.cancel {
     gap: 4px;
   }
 
-  /* Minimap: shrink so it stops covering the resource bar and the map. */
+  /* Minimap: shrink so it stops covering the resource bar and the map, and keep
+     it clear of a notch/rounded corner. */
   .minimap {
     width: 108px;
     height: 108px;
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
   }
 
   /* Compact every panel on small screens (applies to the desktop fallback row
@@ -505,7 +509,10 @@ button.cancel {
   display: flex;
   gap: 4px;
   padding: 6px;
+  /* Respect the home indicator and any landscape notch on the sides. */
   padding-bottom: max(6px, env(safe-area-inset-bottom));
+  padding-left: max(6px, env(safe-area-inset-left));
+  padding-right: max(6px, env(safe-area-inset-right));
   background: rgba(13, 15, 18, 0.92);
   border-top: 1px solid #2c333d;
   backdrop-filter: blur(4px);
