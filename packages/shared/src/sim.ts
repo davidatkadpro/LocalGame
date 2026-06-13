@@ -11,6 +11,7 @@ import {
   UNIT_DEFS,
   UPGRADE_DEFS,
   canAfford,
+  damageMultiplier,
   emptyResources,
   gatherRate,
   incomingDamage,
@@ -1123,11 +1124,12 @@ function doAttack(world: World, u: Unit): void {
   if (u.attackCooldown <= 0) {
     const dmg = unitDamage(world.players[u.owner], u.type);
     if (targetUnit) {
-      targetUnit.hp -= incomingDamage(world.players[targetUnit.owner], targetUnit.type, dmg);
+      const dealt = dmg * damageMultiplier(u.type, targetUnit.type);
+      targetUnit.hp -= incomingDamage(world.players[targetUnit.owner], targetUnit.type, dealt);
       // Remember the attacker so an idle victim fights back (auto-retaliation).
       targetUnit.attackedBy = u.id;
       targetUnit.attackedTtl = RETALIATE_TTL_MS;
-    } else if (targetBuilding) targetBuilding.hp -= dmg;
+    } else if (targetBuilding) targetBuilding.hp -= dmg * damageMultiplier(u.type, "building");
     u.attackCooldown = def.attackMs;
   }
 }

@@ -258,6 +258,24 @@ export function incomingDamage(target: Player, type: UnitType, dmg: number): num
   return MILITARY.includes(type) && hasUpgrade(target, "paddedArmor") ? dmg * 0.75 : dmg;
 }
 
+/**
+ * Combat counters: a multiplier on an attacker's damage based on the target's
+ * category (a unit type, or "building"). Encodes the rock-paper-scissors so
+ * army composition matters — archers shred soldiers at range but barely dent
+ * walls; soldiers run down archers. Unlisted matchups default to 1×. These are
+ * a tuning surface; expect to revise from playtests.
+ */
+const DAMAGE_COUNTERS: Partial<
+  Record<UnitType, Partial<Record<UnitType | "building", number>>>
+> = {
+  soldier: { archer: 1.5 },
+  archer: { soldier: 1.75, worker: 1.25, building: 0.5 },
+};
+
+export function damageMultiplier(attacker: UnitType, target: UnitType | "building"): number {
+  return DAMAGE_COUNTERS[attacker]?.[target] ?? 1;
+}
+
 export const BASE_POP_CAP = 5;
 export const HARD_POP_CAP = 50;
 
