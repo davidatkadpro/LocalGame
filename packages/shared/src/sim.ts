@@ -65,6 +65,13 @@ export function createWorld(seed: number, playerSeeds: PlayerSeed[]): World {
     resourceNodes: gen.resourceNodes,
     nextEntityId: gen.nextEntityId,
     winner: null,
+    stats: playerSeeds.map(() => ({
+      unitsTrained: 0,
+      unitsLost: 0,
+      resourcesGathered: 0,
+      buildingsBuilt: 0,
+      peakPop: 0,
+    })),
   };
 
   playerSeeds.forEach((ps, i) => {
@@ -578,6 +585,7 @@ export function tick(world: World, fog: Fog): void {
   for (const b of world.buildings) {
     if (b.hp <= 0 && b.farmNodeId != null) orphanedFarmNodes.add(b.farmNodeId);
   }
+  for (const u of world.units) if (u.hp <= 0) world.stats[u.owner].unitsLost++;
   world.units = world.units.filter((u) => u.hp > 0);
   world.resourceNodes = world.resourceNodes.filter(
     (n) => (n.amount > 0 || n.owner !== undefined) && !orphanedFarmNodes.has(n.id),
@@ -595,6 +603,7 @@ function spawnFromBuilding(world: World, b: Building, type: UnitType) {
   const exit = approachTile(world, b, { x: b.tile.x + d.w + 0.5, y: b.tile.y + d.h / 2 });
   const pos = exit ?? { x: b.tile.x + d.w + 0.5, y: b.tile.y + d.h / 2 };
   const u = makeUnit(world, b.owner, type, pos);
+  world.stats[b.owner].unitsTrained++;
   if (b.rally) {
     u.state = "moving";
     u.targetTile = { x: Math.floor(b.rally.x), y: Math.floor(b.rally.y) };
@@ -982,6 +991,7 @@ function tryDeposit(world: World, u: Unit): void {
     // Round to kill floating-point dust accumulated from per-tick (rate * TICK_DT) gathers,
     // which otherwise surfaces as 360.000000000001 / 494.99999999999625 in the HUD.
     res[u.carry.kind] = Math.round((res[u.carry.kind] + u.carry.amount) * 1000) / 1000;
+    world.stats[u.owner].resourcesGathered += u.carry.amount;
     u.carry = null;
     // go back to the node if it still exists
     const node = u.targetEntity !== null ? nodeById(world, u.targetEntity) : null;
@@ -1049,6 +1059,7 @@ function chainToNextWall(world: World, u: Unit): boolean {
 
 /** One-time setup when a building finishes: farms spawn their food node. */
 function onBuildingComplete(world: World, b: Building): void {
+  world.stats[b.owner].buildingsBuilt++;
   const def = BUILDING_DEFS[b.type];
   if (def.farm && (b.farmNodeId === undefined || b.farmNodeId === null)) {
     const node = {
@@ -1199,6 +1210,7 @@ function recomputePop(world: World): void {
       if (b.owner === p.id && b.progress >= 1) cap += BUILDING_DEFS[b.type].providesPop;
     }
     p.popCap = Math.min(HARD_POP_CAP, cap);
+    if (world.stats[p.id]) world.stats[p.id].peakPop = Math.max(world.stats[p.id].peakPop, p.pop);
   }
 }
 

@@ -4,6 +4,7 @@ import type {
   GameMap,
   LobbyState,
   PlayerPublic,
+  PlayerStats,
   Snapshot,
 } from "@bg/shared";
 import { Connection, wsUrl } from "./connection";
@@ -25,6 +26,9 @@ interface GameState {
   players: PlayerPublic[];
   seed: number;
   winner: number | null;
+  // final scoreboard payload (set on gameOver)
+  endPlayers: PlayerPublic[];
+  endStats: PlayerStats[];
 
   // snapshot interpolation buffer
   prev: Snapshot | null;
@@ -79,6 +83,8 @@ export const useStore = create<GameState>((set, get) => ({
   players: [],
   seed: 0,
   winner: null,
+  endPlayers: [],
+  endStats: [],
   prev: null,
   curr: null,
   currReceivedAt: 0,
@@ -153,7 +159,13 @@ export const useStore = create<GameState>((set, get) => ({
             }));
             break;
           case "gameOver":
-            set({ phase: "over", winner: msg.winner, reconnecting: false });
+            set({
+              phase: "over",
+              winner: msg.winner,
+              endPlayers: msg.players,
+              endStats: msg.stats,
+              reconnecting: false,
+            });
             // Match is finished — stop auto-reconnecting.
             get().conn?.close();
             break;

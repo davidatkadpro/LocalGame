@@ -346,5 +346,23 @@ function findOpenBlock(world: ReturnType<typeof createWorld>, size: number): { x
   check("explicit attack is not leashed as retaliation", atk.retaliating === false);
 }
 
+// ---- 10. match stats accumulate (scoreboard data) --------------------------
+{
+  const world = createWorld(7, PS);
+  const fog = createFog(world);
+  const worker = world.units.find((u) => u.owner === 0 && u.type === "worker")!;
+  // nearest node of any kind
+  let node = world.resourceNodes[0];
+  let best = Infinity;
+  for (const n of world.resourceNodes) {
+    const d = Math.hypot(n.tile.x - worker.pos.x, n.tile.y - worker.pos.y);
+    if (d < best) { best = d; node = n; }
+  }
+  applyCommand(world, 0, { c: "gather", units: [worker.id], node: node.id });
+  for (let i = 0; i < 250; i++) tick(world, fog); // a full gather->deposit cycle
+  check("stats: resourcesGathered accrues on deposit", world.stats[0].resourcesGathered > 0, `g=${world.stats[0].resourcesGathered}`);
+  check("stats: peakPop tracks starting pop", world.stats[0].peakPop >= 3);
+}
+
 console.log(pass ? "M3: PASS ✅" : "M3: FAIL ❌");
 process.exit(pass ? 0 : 1);

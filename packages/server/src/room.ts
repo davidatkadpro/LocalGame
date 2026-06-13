@@ -270,7 +270,9 @@ export class GameRoom {
     this.loop = null;
     this.phase = "over";
     const winner = this.world?.winner ?? null;
-    for (const s of this.slots.values()) s.conn?.send({ t: "gameOver", winner });
+    const players = this.world ? this.playersPublic() : [];
+    const stats = this.world ? this.world.stats : [];
+    for (const s of this.slots.values()) s.conn?.send({ t: "gameOver", winner, players, stats });
   }
 
   // ---- helpers ----

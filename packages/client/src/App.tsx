@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import type { PlayerPublic, PlayerStats } from "@bg/shared";
 import { useStore } from "./net/store";
 import { Lobby } from "./ui/Lobby";
 import { Game } from "./ui/Game";
@@ -11,6 +12,8 @@ export function App() {
   const winner = useStore((s) => s.winner);
   const myId = useStore((s) => s.myPlayerId);
   const players = useStore((s) => s.players);
+  const endPlayers = useStore((s) => s.endPlayers);
+  const endStats = useStore((s) => s.endStats);
   const reconnecting = useStore((s) => s.reconnecting);
 
   useEffect(() => {
@@ -52,14 +55,22 @@ export function App() {
       {phase === "playing" && <Game />}
 
       {phase === "over" && (
-        <div className="screen center">
-          <div className="card">
+        <div className="screen center over-screen">
+          <div className="card wide">
             <h1>{winner === myId ? "Victory! 🏆" : "Game over"}</h1>
             <p className="muted">
               {winner === null
                 ? "No survivors."
-                : `Winner: ${players.find((p) => p.id === winner)?.name ?? `Player ${winner + 1}`}`}
+                : `Winner: ${(endPlayers.length ? endPlayers : players).find((p) => p.id === winner)?.name ?? `Player ${winner + 1}`}`}
             </p>
+            {endStats.length > 0 && (
+              <Scoreboard
+                players={endPlayers.length ? endPlayers : players}
+                stats={endStats}
+                winner={winner}
+                myId={myId}
+              />
+            )}
             <button className="primary" onClick={() => location.reload()}>
               Back to lobby
             </button>
@@ -67,5 +78,58 @@ export function App() {
         </div>
       )}
     </>
+  );
+}
+
+function Scoreboard({
+  players,
+  stats,
+  winner,
+  myId,
+}: {
+  players: PlayerPublic[];
+  stats: PlayerStats[];
+  winner: number | null;
+  myId: number | null;
+}) {
+  // Winner first, then by resources gathered (a rough "economy" rank).
+  const rows = players
+    .map((p) => ({ p, s: stats[p.id] }))
+    .filter((r) => r.s)
+    .sort((a, b) => {
+      if (a.p.id === winner) return -1;
+      if (b.p.id === winner) return 1;
+      return b.s.resourcesGathered - a.s.resourcesGathered;
+    });
+  return (
+    <table className="scoreboard">
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th title="Units trained">Trained</th>
+          <th title="Units lost">Lost</th>
+          <th title="Resources gathered">Gathered</th>
+          <th title="Peak population">Peak</th>
+          <th title="Buildings constructed">Built</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(({ p, s }) => (
+          <tr key={p.id} className={p.id === winner ? "winner" : ""}>
+            <td>
+              <span className="dot" style={{ background: p.color }} />
+              {p.name}
+              {p.id === winner ? " 🏆" : ""}
+              {p.id === myId ? " (you)" : ""}
+            </td>
+            <td>{s.unitsTrained}</td>
+            <td>{s.unitsLost}</td>
+            <td>{Math.floor(s.resourcesGathered)}</td>
+            <td>{s.peakPop}</td>
+            <td>{s.buildingsBuilt}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

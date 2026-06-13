@@ -111,6 +111,47 @@ button.danger:hover:not(:disabled) {
   background: rgba(5, 7, 10, 0.6);
   z-index: 120;
 }
+
+/* Post-game scoreboard table. */
+.scoreboard {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 14px;
+}
+.scoreboard th,
+.scoreboard td {
+  padding: 7px 10px;
+  text-align: right;
+  border-bottom: 1px solid #2c333d;
+  white-space: nowrap;
+}
+.scoreboard th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.scoreboard th:first-child,
+.scoreboard td:first-child {
+  text-align: left;
+}
+.scoreboard td:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.scoreboard tr.winner td {
+  color: #ffe28a;
+  font-weight: 700;
+}
+.scoreboard .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+}
 button.armed {
   background: #2f8bff;
   border-color: #6cb0ff;

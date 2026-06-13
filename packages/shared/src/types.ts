@@ -120,6 +120,15 @@ export interface Player {
   upgrades: UpgradeId[];
 }
 
+/** Cumulative per-player match stats, surfaced on the post-game scoreboard. */
+export interface PlayerStats {
+  unitsTrained: number;
+  unitsLost: number;
+  resourcesGathered: number;
+  buildingsBuilt: number;
+  peakPop: number;
+}
+
 export interface World {
   seed: number;
   tick: number; // sim tick counter
@@ -130,5 +139,7 @@ export interface World {
   resourceNodes: ResourceNode[];
   nextEntityId: EntityId;
   winner: PlayerId | null;
+  /** per-player cumulative stats, indexed by PlayerId */
+  stats: PlayerStats[];
 }
 

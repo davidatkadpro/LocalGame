@@ -5,6 +5,7 @@ import type {
   BuildingType,
   GameMap,
   PlayerId,
+  PlayerStats,
   Resources,
   ResourceKind,
   UnitState,
@@ -128,7 +129,7 @@ export type ServerMessage =
   | { t: "lobby"; state: LobbyState }
   | { t: "gameStart"; map: GameMap; players: PlayerPublic[]; you: PlayerId; seed: number }
   | { t: "snapshot"; snap: Snapshot }
-  | { t: "gameOver"; winner: PlayerId | null }
+  | { t: "gameOver"; winner: PlayerId | null; players: PlayerPublic[]; stats: PlayerStats[] }
   | { t: "error"; message: string };
 
 // ---------- Portable base64 for Uint8Array (works in Node + browser) ----------
