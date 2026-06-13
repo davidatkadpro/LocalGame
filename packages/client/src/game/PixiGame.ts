@@ -1264,6 +1264,22 @@ export class PixiGame {
         }
       }
     }
+    // friendly completed farm? -> gather its hosted food node. The node sits on
+    // a single tile under the 2x2 footprint (no crop sprite), so a tap anywhere
+    // on the farm should assign workers — not just the exact node tile.
+    for (const b of snap.buildings) {
+      if (b.owner !== this.me() || b.type !== "farm" || b.progress < 1) continue;
+      const def = BUILDING_DEFS[b.type as BuildingType];
+      if (!rectContains(b.tx, b.ty, def.size.w, def.size.h, tx, ty)) continue;
+      const node = snap.resources.find(
+        (n) => n.owner === this.me() && rectContains(b.tx, b.ty, def.size.w, def.size.h, n.tx, n.ty),
+      );
+      if (!node) break;
+      const workers = units.filter((id) => snap.units.find((u) => u.id === id)?.type === "worker");
+      if (workers.length === 0) break; // no workers selected -> fall through to move
+      sfx.command();
+      return this.send({ c: "gather", units: workers, node: node.id });
+    }
     // resource node? (skip enemy-owned farm nodes — the server would reject the
     // gather; fall through to a move so the order isn't silently dropped)
     for (const n of snap.resources) {
