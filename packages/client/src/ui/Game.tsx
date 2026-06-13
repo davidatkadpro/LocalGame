@@ -3,6 +3,7 @@ import type { BuildingType } from "@bg/shared";
 import { PixiGame } from "../game/PixiGame";
 import { Hud } from "./Hud";
 import { Minimap } from "./Minimap";
+import { EventFeed } from "./EventFeed";
 import { useIsMobile } from "./useIsMobile";
 
 export function Game() {
@@ -33,6 +34,7 @@ export function Game() {
     <div className="game">
       <div className="canvas-host" ref={hostRef} />
       {(!isMobile || minimapOpen) && <Minimap getViewport={getViewport} />}
+      <EventFeed />
       <Hud
         onPlace={onPlace}
         onAttackMove={onAttackMove}

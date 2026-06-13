@@ -27,7 +27,7 @@ const UNIT_LABEL: Record<UnitType, string> = {
   archer: "Archer",
   ram: "Ram",
 };
-const BUILDING_LABEL: Record<BuildingType, string> = {
+export const BUILDING_LABEL: Record<BuildingType, string> = {
   town_center: "Town Center",
   house: "House",
   barracks: "Barracks",
