@@ -497,11 +497,33 @@ button.cancel {
 .hud-drawer {
   pointer-events: auto;
   padding: 6px 6px 0;
+  /* Cap width so a single panel doesn't stretch across a wide landscape phone. */
+  max-width: 460px;
   max-height: 52vh;
   overflow-y: auto;
 }
 .hud-drawer .panel {
   margin: 0;
+  padding: 6px 8px;
+  gap: 4px;
+}
+/* Keep drawer controls thumb-sized regardless of which breakpoint triggered
+   the mobile HUD. */
+.hud-drawer button {
+  min-height: 40px;
+}
+/* Build list as a 2-column grid halves the panel height. */
+.hud-drawer .panel-build {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-content: start;
+}
+.hud-drawer .panel-build .panel-title {
+  grid-column: 1 / -1;
+}
+.hud-drawer .panel-build button {
+  font-size: 12px;
+  padding: 8px 6px;
 }
 
 .hud-tabs {
