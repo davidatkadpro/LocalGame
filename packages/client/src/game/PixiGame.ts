@@ -1174,8 +1174,11 @@ export class PixiGame {
 
     if (ownB !== null) {
       const b = snap?.buildings.find((x) => x.id === ownB);
-      // A foundation + workers selected -> construct it (otherwise reselect).
-      if (b && b.progress < 1 && this.selectionHasWorker()) {
+      // Tapping a "work site" with workers selected assigns them rather than
+      // reselecting the building: a foundation -> construct it; a finished farm
+      // -> gather its hosted food node. Otherwise just (re)select the building.
+      const isWorkSite = b && (b.progress < 1 || (b.type === "farm" && b.progress >= 1));
+      if (isWorkSite && this.selectionHasWorker()) {
         this.issueCommandAt(wp);
         return;
       }
