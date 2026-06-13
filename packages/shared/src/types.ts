@@ -43,6 +43,24 @@ export interface ResourceNode {
   owner?: PlayerId;
 }
 
+/** Wild fauna: neutral animals that wander the map. A worker hunts one (attacks
+ *  it) and, once killed, the carcass becomes a neutral food node to gather. */
+export type AnimalKind = "sheep" | "cow";
+
+export interface Animal {
+  id: EntityId;
+  kind: AnimalKind;
+  pos: Vec2; // float tile coords (center)
+  hp: number;
+  /** food the carcass yields once the animal is killed */
+  food: number;
+  /** current wander heading (unit vector); re-rolled when wanderTimer lapses */
+  vx: number;
+  vy: number;
+  /** ticks remaining on the current heading */
+  wanderTimer: number;
+}
+
 export type UnitState =
   | "idle"
   | "moving"
@@ -148,6 +166,8 @@ export interface World {
   units: Unit[];
   buildings: Building[];
   resourceNodes: ResourceNode[];
+  /** neutral wandering wildlife (sheep/cows) workers can hunt for food */
+  animals: Animal[];
   nextEntityId: EntityId;
   winner: PlayerId | null;
   /** per-player cumulative stats, indexed by PlayerId */

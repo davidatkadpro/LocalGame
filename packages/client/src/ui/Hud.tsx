@@ -312,7 +312,8 @@ function SelectionPanelView({
 function ControlsText() {
   return (
     <div className="small muted">
-      Drag-select / click your units. Right-click (or tap) to move, gather, or attack. Press{" "}
+      Drag-select / click your units. Right-click (or tap) to move, gather, or attack. With a worker
+      selected, right-click/tap a <b>sheep or cow</b> to hunt it for food. Press{" "}
       <b>A</b> then click for attack-move; <b>.</b> cycles idle workers.
       <b> Ctrl+1–9</b> sets a control group, <b>1–9</b> recalls it (double-tap to centre). Select a
       building, then right-click/tap to set its rally point. <b>Shift+click</b> queues orders

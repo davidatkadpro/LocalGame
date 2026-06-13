@@ -2,6 +2,7 @@
 // All messages are discriminated unions on `t`.
 
 import type {
+  AnimalKind,
   BuildingType,
   GameMap,
   PlayerId,
@@ -79,6 +80,14 @@ export interface ResourceNodeDTO {
   owner?: PlayerId;
 }
 
+export interface AnimalDTO {
+  id: number;
+  kind: AnimalKind;
+  x: number;
+  y: number;
+  hp: number;
+}
+
 export interface PlayerPublic {
   id: PlayerId;
   name: string;
@@ -107,6 +116,8 @@ export interface Snapshot {
   units: UnitDTO[];
   buildings: BuildingDTO[];
   resources: ResourceNodeDTO[];
+  /** neutral wandering wildlife currently in view */
+  animals: AnimalDTO[];
 }
 
 // ---------- Commands (client intents) ----------

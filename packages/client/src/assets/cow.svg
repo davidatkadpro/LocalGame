@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral wildlife: a patched cow facing right. No team accent. -->
+  <defs>
+    <linearGradient id="hide" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4eee5"/>
+      <stop offset="1" stop-color="#cdc4b6"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="50" cy="88" rx="34" ry="5" fill="#000000" opacity="0.2"/>
+  <!-- legs -->
+  <rect x="28" y="60" width="7" height="26" rx="3" fill="#6b5640"/>
+  <rect x="44" y="62" width="7" height="24" rx="3" fill="#6b5640"/>
+  <rect x="60" y="60" width="7" height="26" rx="3" fill="#5a4734"/>
+  <!-- body -->
+  <rect x="20" y="32" width="58" height="36" rx="18" fill="url(#hide)"/>
+  <!-- patches -->
+  <ellipse cx="37" cy="45" rx="11" ry="9" fill="#5b4630"/>
+  <ellipse cx="62" cy="56" rx="9" ry="8" fill="#5b4630"/>
+  <!-- head -->
+  <g transform="translate(70 38)">
+    <ellipse cx="8" cy="11" rx="14" ry="13" fill="url(#hide)"/>
+    <!-- horns -->
+    <path d="M-2 2 q-6 -6 -10 -4 q5 1 7 6Z" fill="#eae0cf"/>
+    <path d="M18 2 q6 -6 10 -4 q-5 1 -7 6Z" fill="#eae0cf"/>
+    <!-- snout -->
+    <ellipse cx="12" cy="17" rx="8" ry="6" fill="#c9a69f"/>
+    <circle cx="9" cy="17" r="1.6" fill="#5b4630"/>
+    <circle cx="15" cy="17" r="1.6" fill="#5b4630"/>
+    <!-- eye -->
+    <circle cx="5" cy="7" r="2.2" fill="#3a2e22"/>
+  </g>
+</svg>

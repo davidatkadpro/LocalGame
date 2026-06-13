@@ -1,4 +1,5 @@
 ﻿import type {
+  AnimalKind,
   BuildingType,
   Player,
   ResourceKind,
@@ -312,6 +313,22 @@ export const RESOURCE_NODE_AMOUNT: Record<ResourceKind, number> = {
   wood: 300,
   food: 200,
   gold: 400,
+};
+
+// ---- Wildlife ----
+
+export interface AnimalDef {
+  kind: AnimalKind;
+  hp: number; // low — a worker or two fells it quickly
+  food: number; // carcass food yielded when gathered
+  speed: number; // tiles/sec while wandering (slow, so it's huntable)
+}
+
+export const ANIMAL_DEFS: Record<AnimalKind, AnimalDef> = {
+  // A roaming snack: quick to kill, modest food. Good early scouting forage.
+  sheep: { kind: "sheep", hp: 8, food: 100, speed: 0.45 },
+  // A bigger prize worth hunting down: tougher, but a large food cache.
+  cow: { kind: "cow", hp: 22, food: 250, speed: 0.35 },
 };
 
 export function emptyResources(): Resources {

@@ -1,7 +1,9 @@
-﻿import { MAP_HEIGHT, MAP_WIDTH, RESOURCE_NODE_AMOUNT } from "./constants";
+﻿import { ANIMAL_DEFS, MAP_HEIGHT, MAP_WIDTH, RESOURCE_NODE_AMOUNT } from "./constants";
 import { inBounds, tileIndex } from "./geometry";
 import { createRng } from "./rng";
 import type {
+  Animal,
+  AnimalKind,
   EntityId,
   GameMap,
   ResourceKind,
@@ -13,6 +15,8 @@ import type {
 export interface GeneratedMap {
   map: GameMap;
   resourceNodes: ResourceNode[];
+  /** neutral wandering wildlife */
+  animals: Animal[];
   /** one spawn (town-center top-left tile) per player slot */
   spawns: Vec2[];
   nextEntityId: EntityId;
@@ -147,6 +151,66 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
     }
   }
 
-  return { map, resourceNodes, spawns, nextEntityId };
+  // ---- Wildlife: neutral animals workers can hunt for food ----
+  const animals: Animal[] = [];
+  const canPlaceAnimal = (x: number, y: number) =>
+    inBounds(map, x, y) &&
+    tiles[tileIndex(map, x, y)] === "grass" &&
+    !resourceNodes.some((n) => n.tile.x === x && n.tile.y === y) &&
+    !animals.some((a) => Math.floor(a.pos.x) === x && Math.floor(a.pos.y) === y);
+
+  const makeAnimal = (x: number, y: number, kind: AnimalKind) => {
+    animals.push({
+      id: nextEntityId++,
+      kind,
+      pos: { x: x + 0.5, y: y + 0.5 },
+      hp: ANIMAL_DEFS[kind].hp,
+      food: ANIMAL_DEFS[kind].food,
+      vx: 0,
+      vy: 0,
+      wanderTimer: 0, // first tick rolls a heading
+    });
+  };
+
+  // Place up to `n` animals of `kind` on grass near (cx,cy), expanding outward.
+  const placeAnimalsNear = (cx: number, cy: number, n: number, kind: AnimalKind, maxR: number) => {
+    let placed = 0;
+    for (let r = 1; r <= maxR && placed < n; r++) {
+      for (let dy = -r; dy <= r && placed < n; dy++) {
+        for (let dx = -r; dx <= r && placed < n; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; // ring at radius r
+          const x = cx + dx;
+          const y = cy + dy;
+          if (canPlaceAnimal(x, y)) {
+            makeAnimal(x, y, kind);
+            placed++;
+          }
+        }
+      }
+    }
+  };
+
+  // A couple of starter sheep just outside each base (AoE-style early forage).
+  for (const s of spawns) placeAnimalsNear(s.x + 5, s.y + 7, 2, "sheep", 5);
+
+  // Wandering sheep herds scattered across the contested map.
+  const herds = 5;
+  for (let i = 0; i < herds; i++) {
+    const cx = Math.round(rng.range(10, width - 10));
+    const cy = Math.round(rng.range(10, height - 10));
+    if (nearSpawn(cx, cy)) continue;
+    placeAnimalsNear(cx, cy, 3 + rng.int(3), "sheep", 4); // 3–5 sheep
+  }
+
+  // A handful of lone cows — a bigger food prize worth hunting down.
+  const cows = 4;
+  for (let i = 0; i < cows; i++) {
+    const cx = Math.round(rng.range(10, width - 10));
+    const cy = Math.round(rng.range(10, height - 10));
+    if (nearSpawn(cx, cy)) continue;
+    placeAnimalsNear(cx, cy, 1, "cow", 3);
+  }
+
+  return { map, resourceNodes, animals, spawns, nextEntityId };
 }
 

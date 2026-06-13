@@ -3,11 +3,13 @@
 
 import { Application, Container, Graphics, Sprite } from "pixi.js";
 import {
+  ANIMAL_DEFS,
   BUILDING_DEFS,
   TICK_MS,
   UNIT_DEFS,
   base64ToBytes,
   rectContains,
+  type AnimalDTO,
   type BuildingType,
   type Command,
   type GameMap,
@@ -78,6 +80,8 @@ export class PixiGame {
   private unitSprites = new Map<number, Sprite>();
   private buildingSprites = new Map<number, Sprite>();
   private resourceSprites = new Map<number, Sprite>();
+  private animalSprites = new Map<number, Sprite>();
+  private animalFx = new Map<number, { hp: number; flashUntil: number }>();
 
   private selected = new Set<number>();
   private selectedBuilding: number | null = null;
@@ -340,6 +344,7 @@ export class PixiGame {
     this.reconcileResources(st.curr);
     this.reconcileBuildings(st.curr, st);
     this.reconcileUnits(st.prev, st.curr);
+    this.reconcileAnimals(st.prev, st.curr);
     this.updateDying();
     this.drawProjectiles();
     this.drawSelection();
@@ -559,6 +564,43 @@ export class PixiGame {
     }
   }
 
+  private reconcileAnimals(prev: Snapshot | null, curr: Snapshot): void {
+    const t = Math.min(1, (performance.now() - useStore.getState().currReceivedAt) / TICK_MS);
+    const prevById = new Map<number, AnimalDTO>();
+    if (prev) for (const a of prev.animals) prevById.set(a.id, a);
+    const seen = new Set<number>();
+    for (const a of curr.animals) {
+      seen.add(a.id);
+      let sp = this.animalSprites.get(a.id);
+      if (!sp) {
+        sp = new Sprite(textures[a.kind as SpriteKey]);
+        sp.anchor.set(0.5);
+        const s = a.kind === "cow" ? 1.0 : 0.85;
+        sp.width = s;
+        sp.height = s;
+        this.entityLayer.addChild(sp);
+        this.animalSprites.set(a.id, sp);
+      }
+      const p = prevById.get(a.id);
+      const x = p ? p.x + (a.x - p.x) * t : a.x;
+      const y = p ? p.y + (a.y - p.y) * t : a.y;
+      const fx = this.animalFx.get(a.id) ?? { hp: a.hp, flashUntil: 0 };
+      if (a.hp < fx.hp) fx.flashUntil = this.now + 170; // took damage → flash
+      fx.hp = a.hp;
+      this.animalFx.set(a.id, fx);
+      sp.tint = this.now < fx.flashUntil ? 0xff5a5a : 0xffffff;
+      sp.position.set(x, y);
+      sp.zIndex = y + 0.3; // sort by feet, just under units on the same row
+    }
+    for (const [id, sp] of this.animalSprites) {
+      if (!seen.has(id)) {
+        this.dying.push({ sp, born: this.now });
+        this.animalSprites.delete(id);
+        this.animalFx.delete(id);
+      }
+    }
+  }
+
   private drawSelection(): void {
     const g = this.selectionLayer;
     g.clear();
@@ -694,6 +736,13 @@ export class PixiGame {
       const ratio = b.hp / def.hp;
       if (ratio >= 1 && b.progress >= 1) continue;
       bar(b.tx + def.size.w / 2, b.ty - 0.18, def.size.w * 0.9, ratio);
+    }
+    for (const a of snap.animals) {
+      const max = ANIMAL_DEFS[a.kind].hp;
+      if (a.hp >= max) continue; // only once a hunt has started
+      const sp = this.animalSprites.get(a.id);
+      if (!sp) continue;
+      bar(sp.x, sp.y - 0.58, 0.7, a.hp / max);
     }
   }
 
@@ -1292,6 +1341,16 @@ export class PixiGame {
       if (this.isEnemy(b.owner) && rectContains(b.tx, b.ty, def.size.w, def.size.h, tx, ty)) {
         sfx.attack();
         return this.send({ c: "attack", units, target: b.id, queue });
+      }
+    }
+    // wild animal? -> send workers to hunt it (kill it, then auto-gather the
+    // carcass). Only workers hunt; a worker-less selection falls through to move.
+    for (const a of snap.animals) {
+      if (Math.hypot(a.x - wp.x, a.y - wp.y) < 0.6) {
+        const workers = units.filter((id) => snap.units.find((u) => u.id === id)?.type === "worker");
+        if (workers.length === 0) break;
+        sfx.attack();
+        return this.send({ c: "attack", units: workers, target: a.id, queue });
       }
     }
     // friendly building still under construction? -> send workers to finish it.

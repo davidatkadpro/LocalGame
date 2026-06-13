@@ -2,6 +2,7 @@
 // The server owns the only real World; clients receive fog-filtered snapshots.
 
 import {
+  ANIMAL_DEFS,
   BASE_POP_CAP,
   BUILDING_DEFS,
   CARRY_CAPACITY,
@@ -30,6 +31,7 @@ import {
   type UnitDTO,
 } from "./protocol";
 import type {
+  Animal,
   Building,
   BuildingType,
   EntityId,
@@ -77,6 +79,7 @@ export function createWorld(seed: number, playerSeeds: PlayerSeed[]): World {
     units: [],
     buildings: [],
     resourceNodes: gen.resourceNodes,
+    animals: gen.animals,
     nextEntityId: gen.nextEntityId,
     winner: null,
     stats: playerSeeds.map(() => ({
@@ -160,6 +163,7 @@ function makeUnit(world: World, owner: PlayerId, type: UnitType, pos: Vec2): Uni
 const unitById = (w: World, id: EntityId) => w.units.find((u) => u.id === id);
 const buildingById = (w: World, id: EntityId) => w.buildings.find((b) => b.id === id);
 const nodeById = (w: World, id: EntityId) => w.resourceNodes.find((n) => n.id === id);
+const animalById = (w: World, id: EntityId) => w.animals.find((a) => a.id === id);
 
 function buildingCenter(b: Building): Vec2 {
   const d = BUILDING_DEFS[b.type].size;
@@ -632,6 +636,37 @@ function nearestEnemyUnit(world: World, u: Unit): EntityId | null {
   return best;
 }
 
+const ANIMAL_WANDER_MIN = 18; // ticks on a heading before re-rolling
+const ANIMAL_WANDER_SPAN = 36;
+
+/** Wander a wild animal: drift along a slowly-changing heading and bounce off
+ *  blocked tiles. Deterministic — the heading derives from id + tick (no RNG),
+ *  so the authoritative sim stays reproducible. */
+function updateAnimal(world: World, a: Animal): void {
+  if (a.hp <= 0) return;
+  a.wanderTimer--;
+  if (a.wanderTimer <= 0) {
+    let h = (Math.imul(a.id, 2654435761) + Math.imul(world.tick, 40503)) | 0;
+    h ^= h >>> 13;
+    h = Math.imul(h, 1274126177);
+    h ^= h >>> 16;
+    const u = h >>> 0;
+    const ang = (u % 360) * (Math.PI / 180);
+    a.vx = Math.cos(ang);
+    a.vy = Math.sin(ang);
+    a.wanderTimer = ANIMAL_WANDER_MIN + (u % ANIMAL_WANDER_SPAN);
+  }
+  const sp = ANIMAL_DEFS[a.kind].speed * TICK_DT;
+  const nx = a.pos.x + a.vx * sp;
+  const ny = a.pos.y + a.vy * sp;
+  if (stepOpen(world, nx, ny)) {
+    a.pos.x = nx;
+    a.pos.y = ny;
+  } else {
+    a.wanderTimer = 0; // blocked — re-roll a heading next tick
+  }
+}
+
 function tileCenterOf(tile: Vec2): Vec2 {
   return { x: Math.floor(tile.x) + 0.5, y: Math.floor(tile.y) + 0.5 };
 }
@@ -668,6 +703,7 @@ export function tick(world: World, fog: Fog): void {
   world.tick++;
 
   for (const u of world.units) updateUnit(world, u);
+  for (const a of world.animals) updateAnimal(world, a);
   resolveCollisions(world);
 
   // production
@@ -714,6 +750,19 @@ export function tick(world: World, fog: Fog): void {
   }
   for (const u of world.units) if (u.hp <= 0) world.stats[u.owner].unitsLost++;
   world.units = world.units.filter((u) => u.hp > 0);
+  // Hunted animals leave a carcass: a neutral food node (reusing the animal's id
+  // so a worker mid-hunt seamlessly switches to gathering it). Then drop the dead
+  // animal from the herd.
+  for (const a of world.animals) {
+    if (a.hp > 0) continue;
+    world.resourceNodes.push({
+      id: a.id,
+      kind: "food",
+      tile: { x: Math.floor(a.pos.x), y: Math.floor(a.pos.y) },
+      amount: a.food,
+    });
+  }
+  world.animals = world.animals.filter((a) => a.hp > 0);
   world.resourceNodes = world.resourceNodes.filter(
     (n) => (n.amount > 0 || n.owner !== undefined) && !orphanedFarmNodes.has(n.id),
   );
@@ -1294,7 +1343,17 @@ function doAttack(world: World, u: Unit): void {
   const def = UNIT_DEFS[u.type];
   const targetUnit = unitById(world, u.targetEntity);
   const targetBuilding = targetUnit ? null : buildingById(world, u.targetEntity);
-  if (!targetUnit && !targetBuilding) {
+  const targetAnimal = !targetUnit && !targetBuilding ? animalById(world, u.targetEntity) : null;
+  if (!targetUnit && !targetBuilding && !targetAnimal) {
+    // A hunted animal just became a carcass — a neutral food node carrying the
+    // same id. A worker switches straight to walking over and gathering it.
+    const carcass = u.type === "worker" ? nodeById(world, u.targetEntity) : null;
+    if (carcass && carcass.amount > 0 && carcass.owner === undefined) {
+      u.lastGatherNode = carcass.id;
+      u.state = "moving";
+      u.path = findPath(world.map, u.pos, tileCenterOf(carcass.tile), buildingBlocker(world));
+      return;
+    }
     u.targetEntity = null;
     // Re-acquire the next foe (or march on) if this was an attack-move.
     if (resumeAggro(world, u)) return;
@@ -1314,6 +1373,23 @@ function doAttack(world: World, u: Unit): void {
     u.state = "idle";
     return;
   }
+  // Hunting wild fauna: chase the wandering animal down, then chip away at it.
+  // No team/armor logic — animals are neutral. On death it becomes a carcass
+  // (see tick cleanup) the worker then gathers.
+  if (targetAnimal) {
+    const range = dist(u.pos, targetAnimal.pos);
+    if (range > def.range) {
+      u.path = findPath(world.map, u.pos, targetAnimal.pos, buildingBlocker(world));
+      stepAlongPath(world, u);
+      return;
+    }
+    if (u.attackCooldown <= 0) {
+      targetAnimal.hp -= unitDamage(world.players[u.owner], u.type);
+      u.attackCooldown = def.attackMs;
+    }
+    return;
+  }
+
   // No friendly fire: never damage an ally even if explicitly ordered to.
   const targetOwner = targetUnit ? targetUnit.owner : targetBuilding!.owner;
   if (sameTeam(world, targetOwner, u.owner)) {
@@ -1592,6 +1668,12 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
       ...(n.owner !== undefined ? { owner: n.owner } : {}),
     }));
 
+  // Animals roam, so gate them on current visibility (like enemy units), not the
+  // explored mask (like static resources).
+  const animals = world.animals
+    .filter((a) => reveal || seesTile(Math.floor(a.pos.x), Math.floor(a.pos.y)))
+    .map((a) => ({ id: a.id, kind: a.kind, x: a.pos.x, y: a.pos.y, hp: a.hp }));
+
   return {
     tick: world.tick,
     visible: bytesToBase64(visMask),
@@ -1608,6 +1690,7 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
     units,
     buildings,
     resources,
+    animals,
   };
 }
 

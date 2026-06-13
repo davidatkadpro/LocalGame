@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral wildlife: a woolly sheep facing right. No team accent. -->
+  <defs>
+    <radialGradient id="wool" cx="0.4" cy="0.35" r="0.85">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d6d6de"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="86" rx="28" ry="5" fill="#000000" opacity="0.2"/>
+  <!-- legs -->
+  <rect x="34" y="62" width="6" height="22" rx="3" fill="#3a3a40"/>
+  <rect x="56" y="62" width="6" height="22" rx="3" fill="#3a3a40"/>
+  <!-- woolly body: overlapping puffs -->
+  <circle cx="40" cy="52" r="20" fill="url(#wool)"/>
+  <circle cx="58" cy="50" r="19" fill="url(#wool)"/>
+  <circle cx="50" cy="42" r="17" fill="url(#wool)"/>
+  <circle cx="62" cy="58" r="13" fill="url(#wool)"/>
+  <circle cx="34" cy="60" r="12" fill="url(#wool)"/>
+  <!-- head -->
+  <ellipse cx="74" cy="52" rx="11" ry="13" fill="#3b3b42"/>
+  <ellipse cx="78" cy="51" rx="6.5" ry="9" fill="#4a4a52"/>
+  <circle cx="80" cy="48" r="2.3" fill="#ffffff" opacity="0.9"/>
+  <!-- ear -->
+  <ellipse cx="67" cy="43" rx="5" ry="3" fill="#2e2e34" transform="rotate(-25 67 43)"/>
+</svg>

@@ -15,6 +15,8 @@ import siegeWorkshopUrl from "../assets/siege_workshop.svg";
 import treeUrl from "../assets/tree.svg";
 import goldUrl from "../assets/gold.svg";
 import foodUrl from "../assets/food.svg";
+import sheepUrl from "../assets/sheep.svg";
+import cowUrl from "../assets/cow.svg";
 // Team-colour accent layers (white shapes, tinted with the player's colour).
 import workerAccentUrl from "../assets/worker_accent.svg";
 import soldierAccentUrl from "../assets/soldier_accent.svg";
@@ -45,6 +47,8 @@ export type SpriteKey =
   | "tree"
   | "gold"
   | "food"
+  | "sheep"
+  | "cow"
   | "worker_accent"
   | "soldier_accent"
   | "archer_accent"
@@ -74,6 +78,8 @@ const URLS: Record<SpriteKey, string> = {
   tree: treeUrl,
   gold: goldUrl,
   food: foodUrl,
+  sheep: sheepUrl,
+  cow: cowUrl,
   worker_accent: workerAccentUrl,
   soldier_accent: soldierAccentUrl,
   archer_accent: archerAccentUrl,
