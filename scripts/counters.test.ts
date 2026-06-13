@@ -62,15 +62,14 @@ check(
 );
 
 // ---- 3. unit-vs-building damage reflects the counter -----------------------
-// An archer vs a soldier: identical base, but the building multiplier (0.5)
-// means the archer chews a wall far slower than its raw damage implies.
-function archerWallDamage(ticks = 30): number {
+// Place `atkType` next to a wall and measure damage dealt over a window.
+function wallDamageBy(atkType: UnitType, ticks = 30): number {
   const world = createWorld(7, PS);
   const fog = createFog(world);
   const atk = world.units.find((u) => u.owner === 0)!;
-  atk.type = "archer";
-  atk.hp = UNIT_DEFS.archer.hp;
-  atk.pos = { x: 20, y: 20 };
+  atk.type = atkType;
+  atk.hp = UNIT_DEFS[atkType].hp;
+  atk.pos = { x: 21.3, y: 20.5 }; // within melee reach of the wall at (22,20) (dist ~0.7)
   world.units = [atk];
   const wall = {
     id: world.nextEntityId++,
@@ -93,8 +92,15 @@ function archerWallDamage(ticks = 30): number {
   const w = world.buildings.find((b) => b.id === wall.id);
   return hp0 - (w ? Math.max(0, w.hp) : hp0);
 }
-const wallDmg = archerWallDamage();
-check("archer barely dents a wall (counter < base)", wallDmg > 0 && wallDmg < archerVsArcher, `wall=${wallDmg}`);
+const archerWall = wallDamageBy("archer");
+check("archer barely dents a wall (counter < base)", archerWall > 0 && archerWall < archerVsArcher, `wall=${archerWall}`);
+
+// ---- 4. the ram: demolishes buildings, near-useless vs units ---------------
+const ramWall = wallDamageBy("ram");
+const ramVsSoldier = duel("ram", "soldier");
+check("ram demolishes walls far faster than an archer", ramWall > archerWall * 3, `ram=${ramWall} archer=${archerWall}`);
+check("ram is near-useless against units", ramVsSoldier < ramWall, `unit=${ramVsSoldier} wall=${ramWall}`);
+check("soldier counters the ram (>1)", damageMultiplier("soldier", "ram") > 1);
 
 console.log(pass ? "COUNTERS: PASS ✅" : "COUNTERS: FAIL ❌");
 process.exit(pass ? 0 : 1);

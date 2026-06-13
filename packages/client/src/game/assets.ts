@@ -3,6 +3,7 @@ import { Assets, type Texture } from "pixi.js";
 import workerUrl from "../assets/worker.svg";
 import soldierUrl from "../assets/soldier.svg";
 import archerUrl from "../assets/archer.svg";
+import ramUrl from "../assets/ram.svg";
 import townCenterUrl from "../assets/town_center.svg";
 import houseUrl from "../assets/house.svg";
 import barracksUrl from "../assets/barracks.svg";
@@ -10,6 +11,7 @@ import towerUrl from "../assets/tower.svg";
 import storehouseUrl from "../assets/storehouse.svg";
 import farmUrl from "../assets/farm.svg";
 import wallUrl from "../assets/wall.svg";
+import siegeWorkshopUrl from "../assets/siege_workshop.svg";
 import treeUrl from "../assets/tree.svg";
 import goldUrl from "../assets/gold.svg";
 import foodUrl from "../assets/food.svg";
@@ -17,6 +19,7 @@ import foodUrl from "../assets/food.svg";
 import workerAccentUrl from "../assets/worker_accent.svg";
 import soldierAccentUrl from "../assets/soldier_accent.svg";
 import archerAccentUrl from "../assets/archer_accent.svg";
+import ramAccentUrl from "../assets/ram_accent.svg";
 import townCenterAccentUrl from "../assets/town_center_accent.svg";
 import houseAccentUrl from "../assets/house_accent.svg";
 import barracksAccentUrl from "../assets/barracks_accent.svg";
@@ -24,11 +27,13 @@ import towerAccentUrl from "../assets/tower_accent.svg";
 import storehouseAccentUrl from "../assets/storehouse_accent.svg";
 import farmAccentUrl from "../assets/farm_accent.svg";
 import wallAccentUrl from "../assets/wall_accent.svg";
+import siegeWorkshopAccentUrl from "../assets/siege_workshop_accent.svg";
 
 export type SpriteKey =
   | "worker"
   | "soldier"
   | "archer"
+  | "ram"
   | "town_center"
   | "house"
   | "barracks"
@@ -36,24 +41,28 @@ export type SpriteKey =
   | "storehouse"
   | "farm"
   | "wall"
+  | "siege_workshop"
   | "tree"
   | "gold"
   | "food"
   | "worker_accent"
   | "soldier_accent"
   | "archer_accent"
+  | "ram_accent"
   | "town_center_accent"
   | "house_accent"
   | "barracks_accent"
   | "tower_accent"
   | "storehouse_accent"
   | "farm_accent"
-  | "wall_accent";
+  | "wall_accent"
+  | "siege_workshop_accent";
 
 const URLS: Record<SpriteKey, string> = {
   worker: workerUrl,
   soldier: soldierUrl,
   archer: archerUrl,
+  ram: ramUrl,
   town_center: townCenterUrl,
   house: houseUrl,
   barracks: barracksUrl,
@@ -61,12 +70,14 @@ const URLS: Record<SpriteKey, string> = {
   storehouse: storehouseUrl,
   farm: farmUrl,
   wall: wallUrl,
+  siege_workshop: siegeWorkshopUrl,
   tree: treeUrl,
   gold: goldUrl,
   food: foodUrl,
   worker_accent: workerAccentUrl,
   soldier_accent: soldierAccentUrl,
   archer_accent: archerAccentUrl,
+  ram_accent: ramAccentUrl,
   town_center_accent: townCenterAccentUrl,
   house_accent: houseAccentUrl,
   barracks_accent: barracksAccentUrl,
@@ -74,6 +85,7 @@ const URLS: Record<SpriteKey, string> = {
   storehouse_accent: storehouseAccentUrl,
   farm_accent: farmAccentUrl,
   wall_accent: wallAccentUrl,
+  siege_workshop_accent: siegeWorkshopAccentUrl,
 };
 
 /** Whether a sprite type has a team-colour accent layer. */

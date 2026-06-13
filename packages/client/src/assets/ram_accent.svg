@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Team-colour accent: tinted with the player's colour. -->
+  <defs>
+    <linearGradient id="acc" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cccccc"/>
+    </linearGradient>
+  </defs>
+  <!-- pennant on a short mast above the roof -->
+  <rect x="49" y="12" width="3" height="20" rx="1" fill="url(#acc)"/>
+  <polygon points="52,13 74,19 52,25" fill="url(#acc)"/>
+</svg>

@@ -25,6 +25,7 @@ const UNIT_LABEL: Record<UnitType, string> = {
   worker: "Worker",
   soldier: "Soldier",
   archer: "Archer",
+  ram: "Ram",
 };
 const BUILDING_LABEL: Record<BuildingType, string> = {
   town_center: "Town Center",
@@ -34,6 +35,7 @@ const BUILDING_LABEL: Record<BuildingType, string> = {
   storehouse: "Storehouse",
   farm: "Farm",
   wall: "Wall",
+  siege_workshop: "Siege Workshop",
 };
 
 const BUILDABLE = Object.values(BUILDING_DEFS).filter((d) => d.buildable);

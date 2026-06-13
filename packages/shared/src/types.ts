@@ -8,7 +8,7 @@ export type Resources = Record<ResourceKind, number>;
 
 export type Terrain = "grass" | "water" | "forest" | "rock";
 
-export type UnitType = "worker" | "soldier" | "archer";
+export type UnitType = "worker" | "soldier" | "archer" | "ram";
 export type BuildingType =
   | "town_center"
   | "house"
@@ -16,7 +16,8 @@ export type BuildingType =
   | "tower"
   | "storehouse"
   | "farm"
-  | "wall";
+  | "wall"
+  | "siege_workshop";
 
 /** Player-wide researches that modify effective stats. */
 export type UpgradeId = "improvedTools" | "sharpenedBlades" | "paddedArmor";

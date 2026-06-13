@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral base (timber workshop + stone). Banner + cog are an accent layer. -->
+  <defs>
+    <linearGradient id="wWall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c7bfa9"/>
+      <stop offset="1" stop-color="#988f76"/>
+    </linearGradient>
+    <linearGradient id="wRoof" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9a6b39"/>
+      <stop offset="1" stop-color="#5f3c19"/>
+    </linearGradient>
+    <linearGradient id="wBeam" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7c5026"/>
+      <stop offset="1" stop-color="#54381c"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="50" cy="94" rx="42" ry="5" fill="#000000" opacity="0.16"/>
+  <!-- banner pole -->
+  <rect x="61" y="8" width="4" height="32" fill="#7b7363"/>
+  <!-- open-fronted workshop body -->
+  <rect x="14" y="46" width="72" height="46" rx="3" fill="url(#wWall)"/>
+  <!-- timber framing -->
+  <rect x="14" y="46" width="72" height="6" fill="url(#wBeam)"/>
+  <rect x="14" y="86" width="72" height="6" fill="#000000" opacity="0.12"/>
+  <rect x="30" y="52" width="5" height="40" fill="url(#wBeam)" opacity="0.7"/>
+  <rect x="65" y="52" width="5" height="40" fill="url(#wBeam)" opacity="0.7"/>
+  <!-- pitched roof -->
+  <path d="M8 48 L50 26 L92 48 Z" fill="url(#wRoof)"/>
+  <path d="M8 48 L50 26 L50 32 L16 48 Z" fill="#000000" opacity="0.12"/>
+  <!-- dark work-bay opening -->
+  <rect x="38" y="60" width="24" height="32" rx="2" fill="#241a10" opacity="0.6"/>
+  <!-- a big spoked wheel leaning in the bay (siege-y detail) -->
+  <circle cx="50" cy="76" r="11" fill="none" stroke="#3a2a18" stroke-width="3"/>
+  <line x1="50" y1="65" x2="50" y2="87" stroke="#3a2a18" stroke-width="2"/>
+  <line x1="39" y1="76" x2="61" y2="76" stroke="#3a2a18" stroke-width="2"/>
+  <!-- timber stack -->
+  <rect x="18" y="78" width="14" height="5" rx="2" fill="url(#wBeam)"/>
+  <rect x="20" y="84" width="14" height="5" rx="2" fill="url(#wBeam)"/>
+</svg>

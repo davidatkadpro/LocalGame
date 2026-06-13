@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Team-colour accent: tinted with the player's colour. -->
+  <defs>
+    <linearGradient id="acc" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cccccc"/>
+    </linearGradient>
+  </defs>
+  <!-- banner flying from the pole (pole is in the base) -->
+  <polygon points="65,10 86,16 65,22 70,16" fill="url(#acc)"/>
+  <!-- cog emblem on the roof gable -->
+  <g fill="url(#acc)">
+    <circle cx="50" cy="40" r="5"/>
+    <rect x="48" y="31" width="4" height="4"/>
+    <rect x="48" y="45" width="4" height="4"/>
+    <rect x="41" y="38" width="4" height="4"/>
+    <rect x="55" y="38" width="4" height="4"/>
+  </g>
+  <circle cx="50" cy="40" r="2" fill="#000000" opacity="0.4"/>
+</svg>

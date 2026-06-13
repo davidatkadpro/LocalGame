@@ -81,10 +81,23 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     attackMs: 1400,
     trainedAt: "barracks",
   },
+  ram: {
+    type: "ram",
+    hp: 120,
+    speed: 1.4, // slow: needs an escort
+    sight: 4,
+    cost: { wood: 120, gold: 40 },
+    popCost: 2, // heavy
+    trainMs: 16000,
+    damage: 14, // ×5 vs buildings (see DAMAGE_COUNTERS) = 70/hit; ~5 vs units
+    range: 0.9,
+    attackMs: 2000,
+    trainedAt: "siege_workshop",
+  },
 };
 
 /** Unit types that count as military (for combat upgrades). */
-export const MILITARY: UnitType[] = ["soldier", "archer"];
+export const MILITARY: UnitType[] = ["soldier", "archer", "ram"];
 
 export interface BuildingDef {
   type: BuildingType;
@@ -199,6 +212,18 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     canTrain: [],
     buildable: true,
   },
+  siege_workshop: {
+    type: "siege_workshop",
+    hp: 500,
+    sight: 4,
+    size: { w: 3, h: 3 },
+    cost: { wood: 200, gold: 50 },
+    buildMs: 22000,
+    providesPop: 0,
+    isDropOff: false,
+    canTrain: ["ram"], // gates siege behind a dedicated tech building
+    buildable: true,
+  },
 };
 
 export interface UpgradeDef {
@@ -268,8 +293,12 @@ export function incomingDamage(target: Player, type: UnitType, dmg: number): num
 const DAMAGE_COUNTERS: Partial<
   Record<UnitType, Partial<Record<UnitType | "building", number>>>
 > = {
-  soldier: { archer: 1.5 },
-  archer: { soldier: 1.75, worker: 1.25, building: 0.5 },
+  // Soldiers run down archers and rams.
+  soldier: { archer: 1.5, ram: 1.5 },
+  // Archers shred soldiers/rams at range, harass workers, weak on structures.
+  archer: { soldier: 1.75, ram: 1.5, worker: 1.25, building: 0.5 },
+  // Rams demolish buildings/walls but are near-useless against units (needs an escort).
+  ram: { worker: 0.34, soldier: 0.34, archer: 0.34, ram: 0.34, building: 5 },
 };
 
 export function damageMultiplier(attacker: UnitType, target: UnitType | "building"): number {
