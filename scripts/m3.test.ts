@@ -158,6 +158,16 @@ function findOpenBlock(world: ReturnType<typeof createWorld>, size: number): { x
   check("a queued unit keeps a 0-food player alive", world.players[1].alive === true);
 }
 
+// ---- 4b. concede: resign eliminates a player even with a full base ----------
+{
+  const world = createWorld(7, PS);
+  const fog = createFog(world);
+  applyCommand(world, 1, { c: "concede" });
+  tick(world, fog);
+  check("conceding eliminates the player", world.players[1].alive === false);
+  check("concede hands the win to the survivor", world.winner === 0);
+}
+
 // ---- 5. workers auto-resume gathering after finishing a build --------------
 {
   const world = createWorld(7, [PS[0]]);

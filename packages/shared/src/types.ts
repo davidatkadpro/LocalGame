@@ -114,6 +114,8 @@ export interface Player {
   pop: number;
   popCap: number;
   alive: boolean;
+  /** true once the player has resigned; sticks them as eliminated */
+  conceded: boolean;
   /** researched upgrades */
   upgrades: UpgradeId[];
 }

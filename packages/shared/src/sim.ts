@@ -76,6 +76,7 @@ export function createWorld(seed: number, playerSeeds: PlayerSeed[]): World {
       pop: 0,
       popCap: BASE_POP_CAP,
       alive: true,
+      conceded: false,
       upgrades: [],
     });
     const spawn = gen.spawns[i];
@@ -377,6 +378,10 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
         u.retaliating = false;
         u.path = findPath(world.map, u.pos, goal, buildingBlocker(world));
       }
+      break;
+    }
+    case "concede": {
+      player.conceded = true; // resolved by updateWinState next tick
       break;
     }
   }
@@ -1200,6 +1205,11 @@ function recomputePop(world: World): void {
 function updateWinState(world: World): void {
   for (const p of world.players) {
     if (!p.alive) continue;
+    // Resigned -> eliminated (sticky, regardless of remaining buildings/units).
+    if (p.conceded) {
+      p.alive = false;
+      continue;
+    }
     // No buildings -> eliminated (the classic last-building-standing rule).
     if (!world.buildings.some((b) => b.owner === p.id)) {
       p.alive = false;

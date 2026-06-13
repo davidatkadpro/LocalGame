@@ -55,6 +55,8 @@ export function Hud({
   const selectedUnits = useStore((s) => s.selectedUnits);
   const selectedBuilding = useStore((s) => s.selectedBuilding);
   const selectArmed = useStore((s) => s.selectArmed);
+  const command = useStore((s) => s.command);
+  const [confirmConcede, setConfirmConcede] = useState(false);
   const [muted, setMuted] = useState(isMuted());
   const [showControls, setShowControls] = useState(
     () => localStorage.getItem("bg-hideControls") !== "1",
@@ -116,6 +118,7 @@ export function Hud({
           upgrades={upgrades}
           minimapOpen={minimapOpen}
           onToggleMinimap={onToggleMinimap}
+          onConcede={() => setConfirmConcede(true)}
         />
       ) : (
         <div className="hud-bottom">
@@ -127,6 +130,7 @@ export function Hud({
             selectedCount={selectedUnits.length}
             onIdleWorker={onIdleWorker}
             idleWorkers={idleWorkers}
+            onConcede={() => setConfirmConcede(true)}
           />
           <SelectionPanelView
             building={building}
@@ -135,6 +139,29 @@ export function Hud({
             selectedCount={selectedUnits.length}
           />
           <ControlsPanelView showControls={showControls} setControls={setControls} />
+        </div>
+      )}
+
+      {confirmConcede && (
+        <div className="screen center modal-backdrop">
+          <div className="card">
+            <h1>Concede the match?</h1>
+            <p className="muted">
+              You’ll be eliminated and switch to spectating. This can’t be undone.
+            </p>
+            <div className="row">
+              <button onClick={() => setConfirmConcede(false)}>Cancel</button>
+              <button
+                className="danger"
+                onClick={() => {
+                  command({ c: "concede" });
+                  setConfirmConcede(false);
+                }}
+              >
+                🏳 Concede
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>
@@ -163,6 +190,7 @@ function CommandsPanelView({
   selectedCount,
   onIdleWorker,
   idleWorkers,
+  onConcede,
 }: {
   selectArmed: boolean;
   onSelectMode: () => void;
@@ -170,6 +198,7 @@ function CommandsPanelView({
   selectedCount: number;
   onIdleWorker: () => void;
   idleWorkers: number;
+  onConcede: () => void;
 }) {
   return (
     <div className="panel">
@@ -187,6 +216,9 @@ function CommandsPanelView({
       <button onClick={onIdleWorker} disabled={idleWorkers === 0}>
         💤 Idle worker{idleWorkers > 0 ? ` (${idleWorkers})` : ""}{" "}
         <span className="muted small">(.)</span>
+      </button>
+      <button className="danger" onClick={onConcede} title="Resign the match">
+        🏳 Concede
       </button>
     </div>
   );
@@ -288,6 +320,7 @@ function MobileBottom({
   upgrades,
   minimapOpen,
   onToggleMinimap,
+  onConcede,
 }: {
   onPlace: (b: BuildingType) => void;
   onAttackMove: () => void;
@@ -302,6 +335,7 @@ function MobileBottom({
   upgrades: UpgradeId[];
   minimapOpen: boolean;
   onToggleMinimap: () => void;
+  onConcede: () => void;
 }) {
   const [tab, setTab] = useState<MobileTab | null>(null);
 
@@ -336,6 +370,7 @@ function MobileBottom({
               selectedCount={selectedCount}
               onIdleWorker={onIdleWorker}
               idleWorkers={idleWorkers}
+              onConcede={onConcede}
             />
           )}
           {tab === "selection" && (

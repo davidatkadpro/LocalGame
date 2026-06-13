@@ -109,7 +109,8 @@ export type Command =
   | { c: "rally"; building: number; tile: Vec2 }
   | { c: "attack"; units: number[]; target: number }
   | { c: "attackMove"; units: number[]; tile: Vec2 }
-  | { c: "stop"; units: number[] };
+  | { c: "stop"; units: number[] }
+  | { c: "concede" };
 
 // ---------- Client -> Server ----------
 

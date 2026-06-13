@@ -97,6 +97,20 @@ button.primary {
   background: var(--accent);
   border-color: var(--accent);
 }
+button.danger {
+  background: #7a2330;
+  border-color: #b02a37;
+  color: #ffd9de;
+}
+button.danger:hover:not(:disabled) {
+  background: #b02a37;
+}
+
+/* Dim the game behind a confirm dialog so it reads as modal. */
+.modal-backdrop {
+  background: rgba(5, 7, 10, 0.6);
+  z-index: 120;
+}
 button.armed {
   background: #2f8bff;
   border-color: #6cb0ff;
