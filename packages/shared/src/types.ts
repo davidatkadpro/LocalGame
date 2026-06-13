@@ -8,8 +8,18 @@ export type Resources = Record<ResourceKind, number>;
 
 export type Terrain = "grass" | "water" | "forest" | "rock";
 
-export type UnitType = "worker" | "soldier";
-export type BuildingType = "town_center" | "house" | "barracks";
+export type UnitType = "worker" | "soldier" | "archer";
+export type BuildingType =
+  | "town_center"
+  | "house"
+  | "barracks"
+  | "tower"
+  | "storehouse"
+  | "farm"
+  | "wall";
+
+/** Player-wide researches that modify effective stats. */
+export type UpgradeId = "improvedTools" | "sharpenedBlades" | "paddedArmor";
 
 export interface Vec2 {
   x: number;
@@ -28,6 +38,8 @@ export interface ResourceNode {
   kind: ResourceKind;
   tile: Vec2; // integer tile coords
   amount: number; // remaining
+  /** owner for farm-hosted nodes (only this player may harvest); undefined = neutral */
+  owner?: PlayerId;
 }
 
 export type UnitState =
@@ -52,6 +64,21 @@ export interface Unit {
   targetEntity: EntityId | null;
   targetTile: Vec2 | null;
   attackCooldown: number; // ms remaining
+  /** consecutive ticks spent unable to advance (for stuck detection) */
+  stuck: number;
+  /** consecutive forced re-paths on the current order (give up after a few) */
+  repaths: number;
+  /** attack-move destination: walk toward it, engaging any enemy seen en route */
+  aggro: Vec2 | null;
+  /** id of the last enemy that damaged us (for idle auto-retaliation) */
+  attackedBy: EntityId | null;
+  /** ms remaining on the auto-retaliation memory before it lapses */
+  attackedTtl: number;
+  /** true when the current attack engagement is auto-retaliation (leashed to
+   *  sight), false for a player-issued attack (which may chase) */
+  retaliating: boolean;
+  /** last resource node a worker gathered (to resume after building) */
+  lastGatherNode: EntityId | null;
 }
 
 export interface Building {
@@ -66,6 +93,16 @@ export interface Building {
   queue: UnitType[];
   /** ms remaining on the unit currently being produced */
   produceTimer: number;
+  /** where newly produced units walk to (tile center), or null for the door */
+  rally: Vec2 | null;
+  /** upgrade currently being researched here, or null */
+  research: UpgradeId | null;
+  /** ms remaining on the current research */
+  researchTimer: number;
+  /** attack cooldown for defensive buildings (towers), ms remaining */
+  attackCooldown: number;
+  /** for farms: id of the hosted, regenerating food node it spawned when built */
+  farmNodeId?: EntityId | null;
 }
 
 export interface Player {
@@ -76,6 +113,8 @@ export interface Player {
   pop: number;
   popCap: number;
   alive: boolean;
+  /** researched upgrades */
+  upgrades: UpgradeId[];
 }
 
 export interface World {

@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useStore } from "./net/store";
 import { Lobby } from "./ui/Lobby";
 import { Game } from "./ui/Game";
+import { sfx } from "./game/audio";
 
 export function App() {
   const phase = useStore((s) => s.phase);
@@ -10,14 +11,32 @@ export function App() {
   const winner = useStore((s) => s.winner);
   const myId = useStore((s) => s.myPlayerId);
   const players = useStore((s) => s.players);
+  const reconnecting = useStore((s) => s.reconnecting);
 
   useEffect(() => {
     connect();
   }, [connect]);
 
+  // Play the end jingle exactly once per match, not every time winner/myId
+  // change while the over-screen stays up.
+  const playedEnd = useRef(false);
+  useEffect(() => {
+    if (phase !== "over") {
+      playedEnd.current = false;
+      return;
+    }
+    if (playedEnd.current) return;
+    playedEnd.current = true;
+    if (winner === myId) sfx.win();
+    else sfx.lose();
+  }, [phase, winner, myId]);
+
   return (
     <>
-      {error && <div className="error-banner">{error}</div>}
+      {reconnecting && phase !== "over" && (
+        <div className="error-banner reconnecting">Connection lost — reconnecting…</div>
+      )}
+      {error && !reconnecting && <div className="error-banner">{error}</div>}
 
       {phase === "connecting" && (
         <div className="screen center">

@@ -5,28 +5,54 @@ export function wsUrl(): string {
   return `${proto}://${location.host}/ws`;
 }
 
+interface Handlers {
+  onMessage: (msg: ServerMessage) => void;
+  onOpen: () => void;
+  onClose: () => void;
+  /** fired when the socket drops unexpectedly and a reconnect is being attempted */
+  onReconnecting?: () => void;
+}
+
+/**
+ * A WebSocket wrapper that transparently retries on unexpected drops, so a
+ * flaky LAN link or a host hiccup doesn't end the match. After each reconnect
+ * the store re-sends `join` (with the persisted clientId) to resume the game.
+ */
 export class Connection {
-  private ws: WebSocket;
+  private ws!: WebSocket;
   open = false;
+  private intentional = false;
+  private attempt = 0;
 
   constructor(
-    url: string,
-    private handlers: {
-      onMessage: (msg: ServerMessage) => void;
-      onOpen: () => void;
-      onClose: () => void;
-    },
+    private url: string,
+    private handlers: Handlers,
   ) {
-    this.ws = new WebSocket(url);
-    this.ws.onopen = () => {
+    this.dial();
+  }
+
+  private dial(): void {
+    const ws = new WebSocket(this.url);
+    this.ws = ws;
+    ws.onopen = () => {
       this.open = true;
+      this.attempt = 0;
       this.handlers.onOpen();
     };
-    this.ws.onclose = () => {
+    ws.onclose = () => {
       this.open = false;
-      this.handlers.onClose();
+      if (this.intentional) {
+        this.handlers.onClose();
+        return;
+      }
+      this.handlers.onReconnecting?.();
+      this.attempt++;
+      const delay = Math.min(5000, 600 * this.attempt);
+      setTimeout(() => {
+        if (!this.intentional) this.dial();
+      }, delay);
     };
-    this.ws.onmessage = (ev) => {
+    ws.onmessage = (ev) => {
       try {
         this.handlers.onMessage(JSON.parse(ev.data as string) as ServerMessage);
       } catch {
@@ -39,7 +65,9 @@ export class Connection {
     if (this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
   }
 
+  /** Stop retrying and close for good. */
   close(): void {
+    this.intentional = true;
     this.ws.close();
   }
 }

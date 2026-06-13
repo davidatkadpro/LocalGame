@@ -97,6 +97,11 @@ button.primary {
   background: var(--accent);
   border-color: var(--accent);
 }
+button.armed {
+  background: #2f8bff;
+  border-color: #6cb0ff;
+  box-shadow: 0 0 0 2px rgba(108, 176, 255, 0.4);
+}
 button.primary:hover:not(:disabled) {
   background: #2f8bff;
 }
@@ -180,6 +185,20 @@ button.primary:hover:not(:disabled) {
   border: 1px solid #2c333d;
   backdrop-filter: blur(4px);
 }
+
+/* The HUD containers stretch across the screen but only their panels are
+   painted; without this the empty/transparent areas (e.g. the strip beside the
+   bottom panels) would still sit above the canvas and swallow clicks. Make the
+   containers transparent to input and re-enable it on the real controls. */
+.hud-top,
+.hud-bottom {
+  pointer-events: none;
+}
+.hud-top > *,
+.hud-bottom .panel,
+.hud-bottom > button {
+  pointer-events: auto;
+}
 .res {
   display: flex;
   align-items: center;
@@ -210,11 +229,93 @@ button.primary:hover:not(:disabled) {
   max-width: 360px;
   margin-left: auto;
 }
+.hint-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.panel-close {
+  padding: 0 6px;
+  font-size: 16px;
+  line-height: 1;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+}
+.panel-close:hover:not(:disabled) {
+  background: transparent;
+  color: var(--text);
+}
+.hint-reopen {
+  margin-left: auto;
+  align-self: flex-end;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 16px;
+  background: rgba(20, 24, 30, 0.9);
+}
 .panel-title {
   font-size: 12px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.minimap {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 180px;
+  height: 180px;
+  border: 1px solid #2c333d;
+  border-radius: 8px;
+  background: #05070a;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  touch-action: none;
+  cursor: pointer;
+}
+
+.train-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.queue {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: #333b46;
+  font-size: 11px;
+  font-weight: 700;
+}
+button.cancel {
+  margin-left: auto;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.progress {
+  margin-top: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: #333b46;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.1s linear;
 }
 
 .error-banner {
@@ -228,4 +329,33 @@ button.primary:hover:not(:disabled) {
   text-align: center;
   z-index: 100;
   font-size: 14px;
+}
+.error-banner.reconnecting {
+  background: #b8860b;
+}
+
+.icon-btn {
+  padding: 4px 8px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.upgrades {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.upgrades .badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(81, 207, 102, 0.18);
+  border: 1px solid rgba(81, 207, 102, 0.5);
+  color: #b6f0c2;
+  white-space: nowrap;
+}
+.research {
+  margin-top: 4px;
+  border-top: 1px solid #2c333d;
+  padding-top: 6px;
 }

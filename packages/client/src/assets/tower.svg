@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral base (stone). Pennant is a separate accent layer. -->
+  <defs>
+    <linearGradient id="tStone" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#d8d2c2"/>
+      <stop offset="0.5" stop-color="#bcb6a4"/>
+      <stop offset="1" stop-color="#928c7a"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="50" cy="94" rx="30" ry="5" fill="#000000" opacity="0.18"/>
+  <!-- pennant pole -->
+  <rect x="48.5" y="6" width="3" height="14" fill="#7b7363"/>
+  <!-- shaft -->
+  <rect x="30" y="34" width="40" height="60" rx="3" fill="url(#tStone)"/>
+  <!-- stone courses -->
+  <g stroke="#000000" stroke-opacity="0.13" stroke-width="2">
+    <line x1="30" y1="48" x2="70" y2="48"/>
+    <line x1="30" y1="62" x2="70" y2="62"/>
+    <line x1="30" y1="76" x2="70" y2="76"/>
+    <line x1="50" y1="34" x2="50" y2="48"/>
+    <line x1="40" y1="48" x2="40" y2="62"/>
+    <line x1="60" y1="48" x2="60" y2="62"/>
+    <line x1="50" y1="62" x2="50" y2="76"/>
+  </g>
+  <!-- overhanging battlement deck -->
+  <rect x="24" y="26" width="52" height="12" rx="2" fill="url(#tStone)"/>
+  <rect x="24" y="26" width="52" height="4" fill="#000000" opacity="0.15"/>
+  <!-- crenellations -->
+  <rect x="25" y="18" width="9" height="10" fill="url(#tStone)"/>
+  <rect x="40" y="18" width="9" height="10" fill="url(#tStone)"/>
+  <rect x="55" y="18" width="9" height="10" fill="url(#tStone)"/>
+  <rect x="68" y="18" width="7" height="10" fill="url(#tStone)"/>
+  <!-- arrow slit -->
+  <rect x="46" y="52" width="8" height="20" rx="3" fill="#2c2114" opacity="0.4"/>
+  <rect x="28" y="88" width="44" height="6" rx="2" fill="#000000" opacity="0.12"/>
+</svg>

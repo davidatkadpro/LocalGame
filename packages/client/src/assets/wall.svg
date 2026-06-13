@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral base: a stone wall block. Team cap is a separate accent layer. -->
+  <defs>
+    <linearGradient id="wStone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9aa0a6"/>
+      <stop offset="1" stop-color="#646a70"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="50" cy="92" rx="34" ry="5" fill="#000000" opacity="0.2"/>
+  <!-- block body -->
+  <rect x="16" y="24" width="68" height="66" rx="4" fill="url(#wStone)"/>
+  <rect x="16" y="24" width="68" height="10" rx="4" fill="#b5bbc1"/>
+  <!-- crenellations -->
+  <g fill="#7c8288">
+    <rect x="18" y="18" width="14" height="12"/>
+    <rect x="43" y="18" width="14" height="12"/>
+    <rect x="68" y="18" width="14" height="12"/>
+  </g>
+  <!-- brick courses -->
+  <g stroke="#4c5257" stroke-width="2" opacity="0.6">
+    <line x1="16" y1="46" x2="84" y2="46"/>
+    <line x1="16" y1="64" x2="84" y2="64"/>
+    <line x1="50" y1="34" x2="50" y2="46"/>
+    <line x1="33" y1="46" x2="33" y2="64"/>
+    <line x1="67" y1="46" x2="67" y2="64"/>
+    <line x1="50" y1="64" x2="50" y2="90"/>
+  </g>
+</svg>

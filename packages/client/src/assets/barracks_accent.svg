@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Team-colour accent: tinted with the player's colour. -->
+  <defs>
+    <linearGradient id="acc" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cccccc"/>
+    </linearGradient>
+  </defs>
+  <!-- banner flying from the pole (pole is in the base) -->
+  <polygon points="65,12 86,18 65,24 70,18" fill="url(#acc)"/>
+  <!-- crossed swords over the doorway -->
+  <g stroke="url(#acc)" stroke-width="3" stroke-linecap="round">
+    <line x1="44" y1="74" x2="56" y2="86"/>
+    <line x1="56" y1="74" x2="44" y2="86"/>
+  </g>
+</svg>

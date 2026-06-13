@@ -5,21 +5,25 @@ import {
   BASE_POP_CAP,
   BUILDING_DEFS,
   CARRY_CAPACITY,
-  GATHER_PER_SEC,
   HARD_POP_CAP,
   STARTING_RESOURCES,
   TICK_DT,
   UNIT_DEFS,
+  UPGRADE_DEFS,
   canAfford,
   emptyResources,
+  gatherRate,
+  incomingDamage,
   payCost,
+  unitDamage,
 } from "./constants";
 import { Fog, isExplored, isVisible, updateVision } from "./fog";
-import { dist, inBounds, tileIndex } from "./geometry";
+import { dist, inBounds, rectContains, tileIndex } from "./geometry";
 import { generateMap } from "./map";
-import { findPath } from "./pathfinding";
+import { findPath, isWalkable } from "./pathfinding";
 import {
   bytesToBase64,
+  type BuildingDTO,
   type Command,
   type Snapshot,
 } from "./protocol";
@@ -40,7 +44,11 @@ export interface PlayerSeed {
 }
 
 const ARRIVE_EPS = 0.06;
-const REACH_DIST = 1.2; // how close a unit must be to act on a target
+// How close a unit must be to act on a target. Must exceed sqrt(2) so a worker
+// standing diagonally-adjacent to a node tucked under a building (a farm's
+// hosted food node) still counts as in reach.
+const REACH_DIST = 1.5;
+const RETALIATE_TTL_MS = 4000; // how long an idle unit remembers who hit it
 
 // ---------------------------------------------------------------- world setup
 
@@ -67,6 +75,7 @@ export function createWorld(seed: number, playerSeeds: PlayerSeed[]): World {
       pop: 0,
       popCap: BASE_POP_CAP,
       alive: true,
+      upgrades: [],
     });
     const spawn = gen.spawns[i];
     // Town center
@@ -79,6 +88,10 @@ export function createWorld(seed: number, playerSeeds: PlayerSeed[]): World {
       progress: 1,
       queue: [],
       produceTimer: 0,
+      rally: null,
+      research: null,
+      researchTimer: 0,
+      attackCooldown: 0,
     };
     world.buildings.push(tc);
     // Three starting workers near the town center
@@ -107,6 +120,13 @@ function makeUnit(world: World, owner: PlayerId, type: UnitType, pos: Vec2): Uni
     targetEntity: null,
     targetTile: null,
     attackCooldown: 0,
+    stuck: 0,
+    repaths: 0,
+    aggro: null,
+    attackedBy: null,
+    attackedTtl: 0,
+    retaliating: false,
+    lastGatherNode: null,
   };
 }
 
@@ -134,9 +154,7 @@ function buildingBlocker(world: World, ignore?: EntityId) {
     for (const b of world.buildings) {
       if (b.id === ignore) continue;
       const d = BUILDING_DEFS[b.type].size;
-      if (x >= b.tile.x && x < b.tile.x + d.w && y >= b.tile.y && y < b.tile.y + d.h) {
-        return true;
-      }
+      if (rectContains(b.tile.x, b.tile.y, d.w, d.h, x, y)) return true;
     }
     return false;
   };
@@ -158,6 +176,37 @@ function nearestDropOff(world: World, owner: PlayerId, pos: Vec2): Building | nu
   return best;
 }
 
+/**
+ * Nearest walkable tile on the ring just outside a building's footprint.
+ * Units must stand adjacent to a building (not on it) to deposit or construct,
+ * otherwise they get trapped on interior tiles whose neighbours are all blocked.
+ */
+function approachTile(world: World, b: Building, from: Vec2): Vec2 | null {
+  const d = BUILDING_DEFS[b.type].size;
+  const blocked = buildingBlocker(world, b.id);
+  let best: Vec2 | null = null;
+  let bestD = Infinity;
+  for (let y = b.tile.y - 1; y <= b.tile.y + d.h; y++) {
+    for (let x = b.tile.x - 1; x <= b.tile.x + d.w; x++) {
+      const inside = x >= b.tile.x && x < b.tile.x + d.w && y >= b.tile.y && y < b.tile.y + d.h;
+      if (inside) continue;
+      if (!isWalkable(world.map, x, y) || blocked(x, y)) continue;
+      const c = { x: x + 0.5, y: y + 0.5 };
+      const dd = dist(from, c);
+      if (dd < bestD) {
+        bestD = dd;
+        best = c;
+      }
+    }
+  }
+  return best;
+}
+
+function pathToBuilding(world: World, u: Unit, b: Building): Vec2[] {
+  const target = approachTile(world, b, u.pos) ?? buildingCenter(b);
+  return findPath(world.map, u.pos, target, buildingBlocker(world, b.id));
+}
+
 // ---------------------------------------------------------------- commands
 
 export function applyCommand(world: World, playerId: PlayerId, cmd: Command): void {
@@ -167,10 +216,19 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
 
   switch (cmd.c) {
     case "move": {
+      const movers: Unit[] = [];
       for (const id of cmd.units) {
         const u = unitById(world, id);
         if (!u || u.owner !== playerId) continue;
-        orderMove(world, u, cmd.tile);
+        movers.push(u);
+      }
+      if (movers.length === 1) {
+        orderMove(world, movers[0], cmd.tile);
+      } else if (movers.length > 1) {
+        // Spread the group into a formation around the click so they arrive as a
+        // block instead of all converging on one tile and shoving each other.
+        const slots = formationSlots(world, cmd.tile, movers);
+        for (let i = 0; i < movers.length; i++) orderMove(world, movers[i], slots[i]);
       }
       break;
     }
@@ -182,16 +240,21 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
         u.path = [];
         u.targetEntity = null;
         u.targetTile = null;
+        u.aggro = null;
+        u.attackedBy = null;
+        u.retaliating = false;
       }
       break;
     }
     case "gather": {
       const node = nodeById(world, cmd.node);
       if (!node) break;
+      if (node.owner !== undefined && node.owner !== playerId) break; // enemy farm
       for (const id of cmd.units) {
         const u = unitById(world, id);
         if (!u || u.owner !== playerId || u.type !== "worker") continue;
         u.targetEntity = node.id;
+        u.lastGatherNode = node.id;
         u.state = "moving";
         u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world));
       }
@@ -213,11 +276,31 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
         progress: 0,
         queue: [],
         produceTimer: 0,
+        rally: null,
+        research: null,
+        researchTimer: 0,
+        attackCooldown: 0,
       };
       world.buildings.push(b);
       u.targetEntity = b.id;
       u.state = "moving";
-      u.path = findPath(world.map, u.pos, buildingCenter(b), buildingBlocker(world, b.id));
+      u.path = pathToBuilding(world, u, b);
+      break;
+    }
+    case "construct": {
+      // Send workers to (resume) constructing an existing, unfinished building —
+      // e.g. one whose original builder was re-tasked away.
+      const b = buildingById(world, cmd.building);
+      if (!b || b.owner !== playerId || b.progress >= 1) break;
+      for (const id of cmd.units) {
+        const u = unitById(world, id);
+        if (!u || u.owner !== playerId || u.type !== "worker") continue;
+        u.targetEntity = b.id;
+        u.targetTile = null;
+        u.aggro = null;
+        u.state = "moving";
+        u.path = pathToBuilding(world, u, b);
+      }
       break;
     }
     case "train": {
@@ -233,6 +316,39 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
       if (b.queue.length === 1) b.produceTimer = udef.trainMs;
       break;
     }
+    case "cancelTrain": {
+      const b = buildingById(world, cmd.building);
+      if (!b || b.owner !== playerId || b.queue.length === 0) break;
+      // Refund the last-queued unit and remove it.
+      const removed = b.queue.pop()!;
+      const rdef = UNIT_DEFS[removed];
+      player.resources.wood += rdef.cost.wood ?? 0;
+      player.resources.food += rdef.cost.food ?? 0;
+      player.resources.gold += rdef.cost.gold ?? 0;
+      if (b.queue.length === 0) b.produceTimer = 0;
+      break;
+    }
+    case "research": {
+      const b = buildingById(world, cmd.building);
+      if (!b || b.owner !== playerId || b.progress < 1) break;
+      if (b.research !== null) break; // already researching here
+      const udef = UPGRADE_DEFS[cmd.upgrade];
+      if (!udef || udef.building !== b.type) break;
+      if (player.upgrades.includes(cmd.upgrade)) break; // already have it
+      // not already being researched elsewhere
+      if (world.buildings.some((x) => x.owner === playerId && x.research === cmd.upgrade)) break;
+      if (!canAfford(player.resources, udef.cost)) break;
+      payCost(player.resources, udef.cost);
+      b.research = cmd.upgrade;
+      b.researchTimer = udef.researchMs;
+      break;
+    }
+    case "rally": {
+      const b = buildingById(world, cmd.building);
+      if (!b || b.owner !== playerId) break;
+      b.rally = tileCenterOf(cmd.tile);
+      break;
+    }
     case "attack": {
       for (const id of cmd.units) {
         const u = unitById(world, id);
@@ -240,7 +356,25 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
         u.targetEntity = cmd.target;
         u.state = "attacking";
         u.targetTile = null;
+        u.aggro = null;
+        u.attackedBy = null;
+        u.retaliating = false; // explicit attack: chase, don't treat as retaliation
         u.path = [];
+      }
+      break;
+    }
+    case "attackMove": {
+      const goal = tileCenterOf(cmd.tile);
+      for (const id of cmd.units) {
+        const u = unitById(world, id);
+        if (!u || u.owner !== playerId) continue;
+        u.state = "moving";
+        u.targetEntity = null;
+        u.targetTile = { ...cmd.tile };
+        u.aggro = { ...goal };
+        u.attackedBy = null;
+        u.retaliating = false;
+        u.path = findPath(world.map, u.pos, goal, buildingBlocker(world));
       }
       break;
     }
@@ -251,7 +385,111 @@ function orderMove(world: World, u: Unit, tile: Vec2) {
   u.state = "moving";
   u.targetEntity = null;
   u.targetTile = { ...tile };
+  u.aggro = null;
+  u.attackedBy = null;
+  u.retaliating = false;
+  u.repaths = 0;
   u.path = findPath(world.map, u.pos, tileCenterOf(tile), buildingBlocker(world));
+}
+
+/**
+ * Assign each unit its own destination tile in a compact block around `anchor`,
+ * so a group move spreads into a formation instead of stacking on one tile.
+ * Returns a tile per input unit (same order). Deterministic: candidate tiles are
+ * the nearest walkable tiles to the anchor (expanding ring), and units claim
+ * them greedily by id, each taking the closest free slot to where it stands now
+ * (which keeps the group's relative layout and limits path crossing).
+ */
+function formationSlots(world: World, anchor: Vec2, units: Unit[]): Vec2[] {
+  const n = units.length;
+  const ax = Math.floor(anchor.x);
+  const ay = Math.floor(anchor.y);
+  const blocked = buildingBlocker(world);
+  const cand: Vec2[] = [];
+  const seen = new Set<number>();
+  const pushTile = (x: number, y: number) => {
+    if (!inBounds(world.map, x, y)) return;
+    const k = y * world.map.width + x;
+    if (seen.has(k)) return;
+    seen.add(k);
+    if (!isWalkable(world.map, x, y) || blocked(x, y)) return;
+    cand.push({ x, y });
+  };
+  // Grow square rings outward from the anchor until we have enough open tiles.
+  for (let r = 0; cand.length < n && r <= 32; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; // ring at radius r
+        pushTile(ax + dx, ay + dy);
+      }
+    }
+  }
+  while (cand.length < n) cand.push({ x: ax, y: ay }); // degenerate fallback
+
+  const claimed = new Array<boolean>(cand.length).fill(false);
+  const slotFor = new Map<number, Vec2>();
+  for (const u of [...units].sort((a, b) => a.id - b.id)) {
+    let best = -1;
+    let bestD = Infinity;
+    for (let i = 0; i < cand.length; i++) {
+      if (claimed[i]) continue;
+      const d = dist(u.pos, { x: cand[i].x + 0.5, y: cand[i].y + 0.5 });
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    if (best >= 0) {
+      claimed[best] = true;
+      slotFor.set(u.id, cand[best]);
+    }
+  }
+  return units.map((u) => slotFor.get(u.id) ?? { x: ax, y: ay });
+}
+
+/** Recompute a path toward whatever this moving unit is heading for — its order
+ *  target entity (node/building), attack-move destination, or plain target tile.
+ *  Used to re-route a jammed unit regardless of move kind. */
+function repathForMove(world: World, u: Unit): Vec2[] {
+  if (u.targetEntity !== null) {
+    const node = nodeById(world, u.targetEntity);
+    if (node) return findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world));
+    const b = buildingById(world, u.targetEntity);
+    if (b) return pathToBuilding(world, u, b);
+  }
+  if (u.aggro) return findPath(world.map, u.pos, u.aggro, buildingBlocker(world));
+  if (u.targetTile) return findPath(world.map, u.pos, tileCenterOf(u.targetTile), buildingBlocker(world));
+  return [];
+}
+
+/**
+ * Find the nearest enemy unit (preferred) or building within this unit's sight
+ * radius, for attack-move target acquisition. Returns its entity id, or null.
+ */
+function acquireTarget(world: World, u: Unit): EntityId | null {
+  const sight = UNIT_DEFS[u.type].sight;
+  let best: EntityId | null = null;
+  let bestD = sight;
+  for (const e of world.units) {
+    if (e.owner === u.owner || e.hp <= 0) continue;
+    const d = dist(u.pos, e.pos);
+    if (d < bestD) {
+      bestD = d;
+      best = e.id;
+    }
+  }
+  if (best !== null) return best;
+  // no enemy units in range — look for an enemy building
+  bestD = sight;
+  for (const b of world.buildings) {
+    if (b.owner === u.owner) continue;
+    const d = distToBuilding(u.pos, b);
+    if (d < bestD) {
+      bestD = d;
+      best = b.id;
+    }
+  }
+  return best;
 }
 
 function tileCenterOf(tile: Vec2): Vec2 {
@@ -276,9 +514,7 @@ export function placementValid(world: World, type: BuildingType, tile: Vec2): bo
       if (world.resourceNodes.some((n) => n.tile.x === x && n.tile.y === y)) return false;
       for (const b of world.buildings) {
         const bd = BUILDING_DEFS[b.type].size;
-        if (x >= b.tile.x && x < b.tile.x + bd.w && y >= b.tile.y && y < b.tile.y + bd.h) {
-          return false;
-        }
+        if (rectContains(b.tile.x, b.tile.y, bd.w, bd.h, x, y)) return false;
       }
     }
   }
@@ -292,6 +528,7 @@ export function tick(world: World, fog: Fog): void {
   world.tick++;
 
   for (const u of world.units) updateUnit(world, u);
+  resolveCollisions(world);
 
   // production
   for (const b of world.buildings) {
@@ -304,9 +541,41 @@ export function tick(world: World, fog: Fog): void {
     }
   }
 
-  // cleanup dead units, depleted nodes, destroyed buildings
+  // research
+  for (const b of world.buildings) {
+    if (b.progress < 1 || b.research === null) continue;
+    b.researchTimer -= TICK_DT * 1000;
+    if (b.researchTimer <= 0) {
+      const p = world.players[b.owner];
+      if (p && !p.upgrades.includes(b.research)) p.upgrades.push(b.research);
+      b.research = null;
+      b.researchTimer = 0;
+    }
+  }
+
+  // farms slowly replenish their hosted food node up to capacity
+  for (const b of world.buildings) {
+    if (b.progress < 1 || b.farmNodeId == null) continue;
+    const fdef = BUILDING_DEFS[b.type].farm;
+    if (!fdef) continue;
+    const node = nodeById(world, b.farmNodeId);
+    if (node) node.amount = Math.min(fdef.capacity, node.amount + fdef.regenPerSec * TICK_DT);
+  }
+
+  // defensive buildings (towers) auto-attack the nearest enemy in range
+  tickTowers(world);
+
+  // cleanup dead units, depleted nodes, destroyed buildings. A destroyed farm
+  // takes its hosted food node with it; farm nodes (owned) otherwise persist
+  // even at 0 so they can regrow.
+  const orphanedFarmNodes = new Set<number>();
+  for (const b of world.buildings) {
+    if (b.hp <= 0 && b.farmNodeId != null) orphanedFarmNodes.add(b.farmNodeId);
+  }
   world.units = world.units.filter((u) => u.hp > 0);
-  world.resourceNodes = world.resourceNodes.filter((n) => n.amount > 0);
+  world.resourceNodes = world.resourceNodes.filter(
+    (n) => (n.amount > 0 || n.owner !== undefined) && !orphanedFarmNodes.has(n.id),
+  );
   world.buildings = world.buildings.filter((b) => b.hp > 0);
 
   recomputePop(world);
@@ -316,24 +585,159 @@ export function tick(world: World, fog: Fog): void {
 
 function spawnFromBuilding(world: World, b: Building, type: UnitType) {
   const d = BUILDING_DEFS[b.type].size;
-  const pos = { x: b.tile.x + d.w + 0.5, y: b.tile.y + d.h / 2 };
-  world.units.push(makeUnit(world, b.owner, type, pos));
+  // spawn just outside the footprint, on a walkable tile if possible
+  const exit = approachTile(world, b, { x: b.tile.x + d.w + 0.5, y: b.tile.y + d.h / 2 });
+  const pos = exit ?? { x: b.tile.x + d.w + 0.5, y: b.tile.y + d.h / 2 };
+  const u = makeUnit(world, b.owner, type, pos);
+  if (b.rally) {
+    u.state = "moving";
+    u.targetTile = { x: Math.floor(b.rally.x), y: Math.floor(b.rally.y) };
+    u.path = findPath(world.map, u.pos, b.rally, buildingBlocker(world));
+  }
+  world.units.push(u);
+}
+
+/** Towers (and any building with an `attack` def) shoot the nearest enemy unit. */
+function tickTowers(world: World): void {
+  for (const b of world.buildings) {
+    const def = BUILDING_DEFS[b.type];
+    if (!def.attack || b.progress < 1) continue;
+    if (b.attackCooldown > 0) b.attackCooldown -= TICK_DT * 1000;
+    if (b.attackCooldown > 0) continue;
+    let target: Unit | null = null;
+    let bestD = def.attack.range;
+    for (const u of world.units) {
+      if (u.owner === b.owner || u.hp <= 0) continue;
+      const d = distToBuilding(u.pos, b);
+      if (d <= bestD) {
+        bestD = d;
+        target = u;
+      }
+    }
+    if (target) {
+      target.hp -= incomingDamage(world.players[target.owner], target.type, def.attack.damage);
+      b.attackCooldown = def.attack.attackMs;
+    }
+  }
+}
+
+const STUCK_LIMIT = 8; // ticks (~0.8s) of no progress before we re-path
+const MAX_REPATHS = 4; // re-path attempts on a plain move before giving up
+
+/** Distance from a unit to the end of its current path (its real destination). */
+function pathGoalDist(u: Unit): number {
+  if (u.path.length === 0) return 0;
+  return dist(u.pos, u.path[u.path.length - 1]);
+}
+
+/**
+ * Bump/reset the stuck counter based on *progress toward the destination*, not
+ * raw movement: a unit being jostled in place by neighbours still "moves" a
+ * little each tick, which used to mask a jam forever. If it isn't getting closer
+ * to its goal, it's stuck (and will re-path).
+ */
+function bumpStuck(u: Unit, beforeGoalDist: number): void {
+  if (u.path.length > 0 && beforeGoalDist - pathGoalDist(u) < 0.01) {
+    u.stuck++;
+  } else {
+    u.stuck = 0;
+    u.repaths = 0; // made progress — refresh the re-path budget for later jams
+  }
+}
+
+/**
+ * Engage a target as soon as we're close enough, instead of requiring the unit
+ * to reach the exact target tile (which may be occupied by another unit).
+ * Returns true if it transitioned to an action state.
+ */
+function tryEngageTarget(world: World, u: Unit): boolean {
+  if (u.targetEntity === null) return false;
+  const node = nodeById(world, u.targetEntity);
+  if (node) {
+    if (distToTile(u.pos, node.tile) <= REACH_DIST) {
+      u.state = "gathering";
+      u.path = [];
+      u.stuck = 0;
+      return true;
+    }
+    return false;
+  }
+  const b = buildingById(world, u.targetEntity);
+  if (b && b.owner === u.owner && b.progress < 1) {
+    if (distToBuilding(u.pos, b) <= REACH_DIST + 0.6) {
+      u.state = "building";
+      u.path = [];
+      u.stuck = 0;
+      return true;
+    }
+  }
+  return false;
 }
 
 function updateUnit(world: World, u: Unit): void {
   if (u.attackCooldown > 0) u.attackCooldown -= TICK_DT * 1000;
+  // Let the "who hit me" memory lapse only while not actively retaliating, so a
+  // unit mid-fight doesn't forget its foe and disengage early.
+  if (u.attackedTtl > 0 && u.state !== "attacking") {
+    u.attackedTtl -= TICK_DT * 1000;
+    if (u.attackedTtl <= 0) u.attackedBy = null;
+  }
 
   switch (u.state) {
     case "idle":
+      tryRetaliate(world, u);
       return;
-    case "moving":
-      stepAlongPath(u);
-      if (u.path.length === 0) onArrive(world, u);
+    case "moving": {
+      // Attack-move: engage any enemy that comes into sight while travelling.
+      if (u.aggro) {
+        const tid = acquireTarget(world, u);
+        if (tid !== null) {
+          u.targetEntity = tid;
+          u.state = "attacking";
+          u.path = [];
+          u.stuck = 0;
+          return;
+        }
+      }
+      const beforeDist = pathGoalDist(u);
+      stepAlongPath(world, u);
+      bumpStuck(u, beforeDist);
+      if (tryEngageTarget(world, u)) return;
+      const arrived = u.path.length === 0;
+      // Jammed mid-route (a building dropped on our path, a crowd, etc.): re-path
+      // toward the goal a bounded number of times instead of giving up. Applies
+      // to every kind of move — plain, attack-move, and gather/build approaches —
+      // not just plain moves.
+      if (!arrived && u.stuck >= STUCK_LIMIT && u.repaths < MAX_REPATHS) {
+        u.stuck = 0;
+        u.repaths++;
+        u.path = repathForMove(world, u);
+        return;
+      }
+      if (arrived || u.stuck >= STUCK_LIMIT) {
+        u.stuck = 0;
+        u.repaths = 0;
+        if (u.aggro) {
+          // reached the attack-move destination (or gave up re-pathing to it)
+          u.aggro = null;
+          u.state = "idle";
+          u.targetTile = null;
+        } else {
+          onArrive(world, u);
+        }
+      }
       return;
-    case "returning":
-      stepAlongPath(u);
-      if (u.path.length === 0) tryDeposit(world, u);
+    }
+    case "returning": {
+      const beforeDist = pathGoalDist(u);
+      stepAlongPath(world, u);
+      bumpStuck(u, beforeDist);
+      if (u.path.length === 0 || u.stuck >= STUCK_LIMIT) {
+        u.stuck = 0;
+        tryDeposit(world, u);
+      }
       return;
+    }
     case "gathering":
       doGather(world, u);
       return;
@@ -346,10 +750,13 @@ function updateUnit(world: World, u: Unit): void {
   }
 }
 
-function stepAlongPath(u: Unit): void {
+function stepAlongPath(world: World, u: Unit): void {
   if (u.path.length === 0) return;
-  const speed = UNIT_DEFS[u.type].speed * TICK_DT;
-  let budget = speed;
+  // 1) Pure straight path-following. Untouched by avoidance so a unit always
+  //    advances along its waypoints and actually reaches its goal.
+  let budget = UNIT_DEFS[u.type].speed * TICK_DT;
+  let hx = 0;
+  let hy = 0; // heading of the last (non-snap) step — drives avoidance below
   while (budget > 0 && u.path.length > 0) {
     const target = u.path[0];
     const dx = target.x - u.pos.x;
@@ -361,9 +768,152 @@ function stepAlongPath(u: Unit): void {
       u.path.shift();
       budget -= d;
     } else {
-      u.pos.x += (dx / d) * budget;
-      u.pos.y += (dy / d) * budget;
+      hx = dx / d;
+      hy = dy / d;
+      u.pos.x += hx * budget;
+      u.pos.y += hy * budget;
       budget = 0;
+    }
+  }
+  // 2) Separate lateral avoidance: slide around any unit in the corridor ahead
+  //    without consuming path budget or dropping waypoints (A* ignores units, so
+  //    this is what makes crowds flow past each other instead of jamming).
+  //    Skip it on the final leg so units settle onto their goal/formation slot
+  //    instead of orbiting it forever when neighbours are nearby.
+  if ((hx !== 0 || hy !== 0) && u.path.length > 1) {
+    const avoid = avoidanceSteer(world, u, hx, hy);
+    if (avoid.x !== 0 || avoid.y !== 0) {
+      const lateral = UNIT_DEFS[u.type].speed * TICK_DT;
+      const nx = u.pos.x + avoid.x * lateral;
+      const ny = u.pos.y + avoid.y * lateral;
+      if (stepOpen(world, nx, ny)) {
+        u.pos.x = nx;
+        u.pos.y = ny;
+      }
+    }
+  }
+}
+
+// Local-avoidance tuning.
+const AVOID_LOOKAHEAD = 1.1; // tiles ahead we watch for a blocking unit
+const AVOID_STRENGTH = 0.6; // fraction of a step spent sliding sideways
+
+/** True if a unit may occupy the point (walkable terrain, no building footprint). */
+function stepOpen(world: World, x: number, y: number): boolean {
+  const tx = Math.floor(x);
+  const ty = Math.floor(y);
+  if (!isWalkable(world.map, tx, ty)) return false;
+  for (const b of world.buildings) {
+    const d = BUILDING_DEFS[b.type].size;
+    if (rectContains(b.tile.x, b.tile.y, d.w, d.h, tx, ty)) return false;
+  }
+  return true;
+}
+
+/**
+ * Lateral steering to slide a moving unit around the nearest other unit directly
+ * ahead of it. Returns a perpendicular unit-ish vector (magnitude 0..1, zero if
+ * the corridor is clear). Deterministic: a head-on pair always yields to mirrored
+ * sides, so they pass each other instead of bouncing back along their approach.
+ */
+function avoidanceSteer(world: World, u: Unit, hx: number, hy: number): { x: number; y: number } {
+  const minSep = UNIT_RADIUS * 2;
+  let bestProj = Infinity;
+  let bestPerp = 0;
+  let found = false;
+  for (const v of world.units) {
+    if (v === u || v.hp <= 0) continue;
+    const rx = v.pos.x - u.pos.x;
+    const ry = v.pos.y - u.pos.y;
+    if (Math.abs(rx) > AVOID_LOOKAHEAD || Math.abs(ry) > AVOID_LOOKAHEAD) continue; // cheap cull
+    const proj = rx * hx + ry * hy; // distance ahead along our heading
+    if (proj <= 0 || proj > AVOID_LOOKAHEAD) continue; // behind us or too far
+    const perp = rx * -hy + ry * hx; // signed lateral offset (left = positive)
+    if (Math.abs(perp) > minSep) continue; // outside our corridor — no conflict
+    if (proj < bestProj) {
+      bestProj = proj;
+      bestPerp = perp;
+      found = true;
+    }
+  }
+  if (!found) return { x: 0, y: 0 };
+  // Yield away from the blocker's side; a dead-ahead blocker (perp ~ 0) defaults
+  // to one fixed side so a head-on pair picks mirrored world-sides and separates.
+  const sideSign = bestPerp > 0 ? -1 : 1; // blocker on our left -> veer right
+  const lx = -hy; // left-perpendicular unit vector
+  const ly = hx;
+  const urgency = 1 - bestProj / AVOID_LOOKAHEAD; // closer blockers slide harder
+  const s = AVOID_STRENGTH * urgency * sideSign;
+  return { x: lx * s, y: ly * s };
+}
+
+const UNIT_RADIUS = 0.32; // min separation between unit centres = 2 * radius
+
+/**
+ * Soft separation so units don't stack on the same point. Uses a per-tile
+ * spatial hash and pushes overlapping pairs apart, never into walls/buildings.
+ * Deterministic (no RNG) so the authoritative sim stays reproducible.
+ */
+function resolveCollisions(world: World): void {
+  const minSep = UNIT_RADIUS * 2;
+  const w = world.map.width;
+  const blocked = buildingBlocker(world);
+  const open = (x: number, y: number) =>
+    isWalkable(world.map, x, y) && !blocked(x, y);
+
+  const cells = new Map<number, Unit[]>();
+  for (const u of world.units) {
+    const k = Math.floor(u.pos.y) * w + Math.floor(u.pos.x);
+    const arr = cells.get(k);
+    if (arr) arr.push(u);
+    else cells.set(k, [u]);
+  }
+
+  const push = (u: Unit, dx: number, dy: number) => {
+    const nx = u.pos.x + dx;
+    if (open(Math.floor(nx), Math.floor(u.pos.y))) u.pos.x = nx;
+    const ny = u.pos.y + dy;
+    if (open(Math.floor(u.pos.x), Math.floor(ny))) u.pos.y = ny;
+  };
+  // Gathering/constructing units are "anchored": others flow around them, but
+  // they aren't displaced (which otherwise causes gather/move state flicker).
+  const anchored = (x: Unit) => x.state === "gathering" || x.state === "building";
+
+  for (const u of world.units) {
+    const cx = Math.floor(u.pos.x);
+    const cy = Math.floor(u.pos.y);
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const arr = cells.get((cy + dy) * w + (cx + dx));
+        if (!arr) continue;
+        for (const v of arr) {
+          if (v.id <= u.id) continue; // resolve each pair once
+          let ox = u.pos.x - v.pos.x;
+          let oy = u.pos.y - v.pos.y;
+          let d = Math.hypot(ox, oy);
+          if (d >= minSep) continue;
+          if (d < 1e-4) {
+            // exactly coincident: deterministic nudge derived from ids
+            ox = ((u.id % 7) - 3) * 0.01 + 0.005;
+            oy = ((v.id % 5) - 2) * 0.01 + 0.005;
+            d = Math.hypot(ox, oy) || 1;
+          }
+          const overlap = minSep - d;
+          const nx = ox / d;
+          const ny = oy / d;
+          const au = anchored(u);
+          const av = anchored(v);
+          if (au && av) continue;
+          if (au) {
+            push(v, -nx * overlap, -ny * overlap);
+          } else if (av) {
+            push(u, nx * overlap, ny * overlap);
+          } else {
+            push(u, (nx * overlap) / 2, (ny * overlap) / 2);
+            push(v, (-nx * overlap) / 2, (-ny * overlap) / 2);
+          }
+        }
+      }
     }
   }
 }
@@ -398,8 +948,10 @@ function doGather(world: World, u: Unit): void {
     u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world));
     return;
   }
+  u.lastGatherNode = node.id; // remember it so we can resume after a build detour
   if (!u.carry || u.carry.kind !== node.kind) u.carry = { kind: node.kind, amount: 0 };
-  const take = Math.min(GATHER_PER_SEC * TICK_DT, node.amount, CARRY_CAPACITY - u.carry.amount);
+  const rate = gatherRate(world.players[u.owner]);
+  const take = Math.min(rate * TICK_DT, node.amount, CARRY_CAPACITY - u.carry.amount);
   node.amount -= take;
   u.carry.amount += take;
   if (u.carry.amount >= CARRY_CAPACITY || node.amount <= 0) {
@@ -414,13 +966,16 @@ function startReturn(world: World, u: Unit): void {
     return;
   }
   u.state = "returning";
-  u.path = findPath(world.map, u.pos, buildingCenter(drop), buildingBlocker(world, drop.id));
+  u.path = pathToBuilding(world, u, drop);
 }
 
 function tryDeposit(world: World, u: Unit): void {
   const drop = nearestDropOff(world, u.owner, u.pos);
-  if (drop && distToBuilding(u.pos, drop) <= REACH_DIST && u.carry) {
-    world.players[u.owner].resources[u.carry.kind] += u.carry.amount;
+  if (drop && distToBuilding(u.pos, drop) <= REACH_DIST + 0.6 && u.carry) {
+    const res = world.players[u.owner].resources;
+    // Round to kill floating-point dust accumulated from per-tick (rate * TICK_DT) gathers,
+    // which otherwise surfaces as 360.000000000001 / 494.99999999999625 in the HUD.
+    res[u.carry.kind] = Math.round((res[u.carry.kind] + u.carry.amount) * 1000) / 1000;
     u.carry = null;
     // go back to the node if it still exists
     const node = u.targetEntity !== null ? nodeById(world, u.targetEntity) : null;
@@ -433,7 +988,7 @@ function tryDeposit(world: World, u: Unit): void {
     }
   } else if (drop) {
     u.state = "returning";
-    u.path = findPath(world.map, u.pos, buildingCenter(drop), buildingBlocker(world, drop.id));
+    u.path = pathToBuilding(world, u, drop);
   } else {
     u.state = "idle";
   }
@@ -442,13 +997,15 @@ function tryDeposit(world: World, u: Unit): void {
 function doBuild(world: World, u: Unit): void {
   const b = u.targetEntity !== null ? buildingById(world, u.targetEntity) : null;
   if (!b || b.progress >= 1) {
-    u.state = "idle";
-    u.targetEntity = null;
+    // Finished (by us or someone else) / gone. Chaining along a wall line keeps a
+    // single worker building the whole run; otherwise go back to gathering.
+    if (b && b.type === "wall" && chainToNextWall(world, u)) return;
+    resumeGatherOrIdle(world, u);
     return;
   }
   if (distToBuilding(u.pos, b) > REACH_DIST + 0.6) {
     u.state = "moving";
-    u.path = findPath(world.map, u.pos, buildingCenter(b), buildingBlocker(world, b.id));
+    u.path = pathToBuilding(world, u, b);
     return;
   }
   const def = BUILDING_DEFS[b.type];
@@ -456,13 +1013,72 @@ function doBuild(world: World, u: Unit): void {
   b.hp = Math.max(b.hp, Math.floor(def.hp * (0.1 + 0.9 * b.progress)));
   if (b.progress >= 1) {
     b.hp = def.hp;
-    u.state = "idle";
-    u.targetEntity = null;
+    onBuildingComplete(world, b);
+    if (b.type === "wall" && chainToNextWall(world, u)) return;
+    resumeGatherOrIdle(world, u);
   }
+}
+
+/**
+ * After finishing a wall, send the builder to the nearest unfinished friendly
+ * wall nearby so one worker constructs a whole dragged wall line on its own.
+ */
+function chainToNextWall(world: World, u: Unit): boolean {
+  let best: Building | null = null;
+  let bestD = 12; // only chain to walls within a dozen tiles
+  for (const b of world.buildings) {
+    if (b.owner !== u.owner || b.type !== "wall" || b.progress >= 1) continue;
+    const d = distToBuilding(u.pos, b);
+    if (d < bestD) {
+      bestD = d;
+      best = b;
+    }
+  }
+  if (!best) return false;
+  u.targetEntity = best.id;
+  u.state = "moving";
+  u.path = pathToBuilding(world, u, best);
+  return true;
+}
+
+/** One-time setup when a building finishes: farms spawn their food node. */
+function onBuildingComplete(world: World, b: Building): void {
+  const def = BUILDING_DEFS[b.type];
+  if (def.farm && (b.farmNodeId === undefined || b.farmNodeId === null)) {
+    const node = {
+      id: world.nextEntityId++,
+      kind: "food" as const,
+      tile: { x: b.tile.x, y: b.tile.y },
+      amount: def.farm.capacity,
+      owner: b.owner,
+    };
+    world.resourceNodes.push(node);
+    b.farmNodeId = node.id;
+  }
+}
+
+/**
+ * After a worker finishes (or abandons) a build, send it back to the resource
+ * node it was last gathering if that node still has anything left — otherwise
+ * just go idle. Saves the player from re-tasking every builder by hand.
+ */
+function resumeGatherOrIdle(world: World, u: Unit): void {
+  u.targetEntity = null;
+  if (u.type === "worker" && u.lastGatherNode !== null) {
+    const node = nodeById(world, u.lastGatherNode);
+    if (node && node.amount > 0) {
+      u.targetEntity = node.id;
+      u.state = "moving";
+      u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world));
+      return;
+    }
+  }
+  u.state = "idle";
 }
 
 function doAttack(world: World, u: Unit): void {
   if (u.targetEntity === null) {
+    if (resumeAggro(world, u)) return;
     u.state = "idle";
     return;
   }
@@ -470,8 +1086,10 @@ function doAttack(world: World, u: Unit): void {
   const targetUnit = unitById(world, u.targetEntity);
   const targetBuilding = targetUnit ? null : buildingById(world, u.targetEntity);
   if (!targetUnit && !targetBuilding) {
-    u.state = "idle";
     u.targetEntity = null;
+    // Re-acquire the next foe (or march on) if this was an attack-move.
+    if (resumeAggro(world, u)) return;
+    u.state = "idle";
     return;
   }
 
@@ -481,6 +1099,16 @@ function doAttack(world: World, u: Unit): void {
     : distToBuilding(u.pos, targetBuilding!);
 
   if (range > def.range) {
+    // Auto-retaliation is leashed: stand and fight, but don't pursue a foe that
+    // has fled beyond our sight (otherwise units get kited across the map).
+    if (isRetaliation(u) && range > UNIT_DEFS[u.type].sight) {
+      u.targetEntity = null;
+      u.attackedBy = null;
+      u.retaliating = false;
+      u.state = "idle";
+      u.path = [];
+      return;
+    }
     // close in
     u.path = findPath(
       world.map,
@@ -488,15 +1116,67 @@ function doAttack(world: World, u: Unit): void {
       targetUnit ? targetUnit.pos : buildingCenter(targetBuilding!),
       buildingBlocker(world, targetBuilding?.id),
     );
-    stepAlongPath(u);
+    stepAlongPath(world, u);
     return;
   }
   // in range: attack on cooldown
   if (u.attackCooldown <= 0) {
-    if (targetUnit) targetUnit.hp -= def.damage;
-    else if (targetBuilding) targetBuilding.hp -= def.damage;
+    const dmg = unitDamage(world.players[u.owner], u.type);
+    if (targetUnit) {
+      targetUnit.hp -= incomingDamage(world.players[targetUnit.owner], targetUnit.type, dmg);
+      // Remember the attacker so an idle victim fights back (auto-retaliation).
+      targetUnit.attackedBy = u.id;
+      targetUnit.attackedTtl = RETALIATE_TTL_MS;
+    } else if (targetBuilding) targetBuilding.hp -= dmg;
     u.attackCooldown = def.attackMs;
   }
+}
+
+/**
+ * For an attack-move unit whose target is gone: grab the next enemy in sight,
+ * otherwise resume walking toward the attack-move destination. Returns true if
+ * the unit was kept busy (caller should not fall through to idle).
+ */
+function resumeAggro(world: World, u: Unit): boolean {
+  if (!u.aggro) return false;
+  const next = acquireTarget(world, u);
+  if (next !== null) {
+    u.targetEntity = next;
+    u.state = "attacking";
+    u.path = [];
+    return true;
+  }
+  u.state = "moving";
+  u.path = findPath(world.map, u.pos, u.aggro, buildingBlocker(world));
+  return true;
+}
+
+/** True if this unit's current engagement came from auto-retaliation, not a
+ * player-issued attack/attack-move (which are allowed to chase across the map).
+ * Tracked with an explicit flag rather than inferred from `attackedBy`, because
+ * a player-ordered target that hits back would otherwise look like retaliation. */
+function isRetaliation(u: Unit): boolean {
+  return u.aggro === null && u.retaliating;
+}
+
+/**
+ * An idle unit that was recently attacked turns to fight back. It does not chase
+ * across the map: engagement is dropped once the attacker leaves the unit's
+ * sight (see the leash in `doAttack`), and with no `aggro` set the unit falls
+ * back to idle when the foe dies — it won't wander off.
+ */
+function tryRetaliate(world: World, u: Unit): void {
+  if (u.attackedBy === null) return;
+  const foe = unitById(world, u.attackedBy);
+  if (!foe || foe.hp <= 0 || foe.owner === u.owner) {
+    u.attackedBy = null;
+    return;
+  }
+  if (dist(u.pos, foe.pos) > UNIT_DEFS[u.type].sight) return; // too far — hold position
+  u.targetEntity = foe.id;
+  u.state = "attacking";
+  u.retaliating = true; // leashed engagement (see isRetaliation / doAttack)
+  u.path = [];
 }
 
 function distToTile(pos: Vec2, tile: Vec2): number {
@@ -517,8 +1197,21 @@ function recomputePop(world: World): void {
 
 function updateWinState(world: World): void {
   for (const p of world.players) {
-    const hasBuilding = world.buildings.some((b) => b.owner === p.id);
-    if (!hasBuilding) p.alive = false;
+    if (!p.alive) continue;
+    // No buildings -> eliminated (the classic last-building-standing rule).
+    if (!world.buildings.some((b) => b.owner === p.id)) {
+      p.alive = false;
+      continue;
+    }
+    // Economic collapse: no food and no units (and nothing queued) is
+    // unrecoverable — every unit costs food, so they can never gather or train
+    // again. Don't count a player whose building still has a unit queued (its
+    // food was already paid; that unit will pop).
+    const hasUnit = world.units.some((u) => u.owner === p.id);
+    const hasQueued = world.buildings.some((b) => b.owner === p.id && b.queue.length > 0);
+    if (p.resources.food < 1 && !hasUnit && !hasQueued) {
+      p.alive = false;
+    }
   }
   const alive = world.players.filter((p) => p.alive);
   if (world.players.length >= 2 && alive.length <= 1) {
@@ -548,19 +1241,41 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
 
   const buildings = world.buildings
     .filter((b) => b.owner === player || buildingFootprintVisible(fog, player, b))
-    .map((b) => ({
-      id: b.id,
-      owner: b.owner,
-      type: b.type,
-      tx: b.tile.x,
-      ty: b.tile.y,
-      hp: b.hp,
-      progress: b.progress,
-    }));
+    .map((b) => {
+      const dto: BuildingDTO = {
+        id: b.id,
+        owner: b.owner,
+        type: b.type,
+        tx: b.tile.x,
+        ty: b.tile.y,
+        hp: b.hp,
+        progress: b.progress,
+      };
+      if (b.owner === player) {
+        dto.queue = b.queue.slice();
+        dto.produceTimer = b.produceTimer;
+        dto.produceMs = b.queue.length ? UNIT_DEFS[b.queue[0]].trainMs : 0;
+        if (b.rally) {
+          dto.rallyX = b.rally.x;
+          dto.rallyY = b.rally.y;
+        }
+        dto.research = b.research;
+        dto.researchTimer = b.researchTimer;
+        dto.researchMs = b.research ? UPGRADE_DEFS[b.research].researchMs : 0;
+      }
+      return dto;
+    });
 
   const resources = world.resourceNodes
     .filter((n) => isExplored(fog, player, n.tile.x, n.tile.y))
-    .map((n) => ({ id: n.id, kind: n.kind, tx: n.tile.x, ty: n.tile.y, amount: n.amount }));
+    .map((n) => ({
+      id: n.id,
+      kind: n.kind,
+      tx: n.tile.x,
+      ty: n.tile.y,
+      amount: n.amount,
+      ...(n.owner !== undefined ? { owner: n.owner } : {}),
+    }));
 
   return {
     tick: world.tick,
@@ -571,6 +1286,7 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
       resources: me ? { ...me.resources } : emptyResources(),
       pop: me ? me.pop : 0,
       popCap: me ? me.popCap : 0,
+      upgrades: me ? me.upgrades.slice() : [],
     },
     units,
     buildings,

@@ -1,7 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect x="12" y="40" width="76" height="52" rx="4" fill="#ffffff"/>
-  <rect x="12" y="40" width="76" height="12" fill="#000000" opacity="0.2"/>
-  <rect x="40" y="58" width="20" height="34" fill="#000000" opacity="0.28"/>
-  <rect x="62" y="14" width="6" height="30" fill="#ffffff"/>
-  <polygon points="68,16 86,22 68,28" fill="#ffffff"/>
+  <!-- Neutral base (stone). Banner + emblem are a separate accent layer. -->
+  <defs>
+    <linearGradient id="bWall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#cfc9b8"/>
+      <stop offset="1" stop-color="#a39c86"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="50" cy="94" rx="42" ry="5" fill="#000000" opacity="0.16"/>
+  <!-- banner pole -->
+  <rect x="61" y="10" width="4" height="34" fill="#7b7363"/>
+  <!-- main hall -->
+  <rect x="12" y="40" width="76" height="52" rx="3" fill="url(#bWall)"/>
+  <!-- crenellated top band -->
+  <rect x="12" y="40" width="76" height="12" fill="#000000" opacity="0.16"/>
+  <rect x="16" y="34" width="9" height="8" fill="url(#bWall)"/>
+  <rect x="33" y="34" width="9" height="8" fill="url(#bWall)"/>
+  <rect x="50" y="34" width="9" height="8" fill="url(#bWall)"/>
+  <rect x="67" y="34" width="9" height="8" fill="url(#bWall)"/>
+  <!-- arched doorway -->
+  <path d="M38 92 L38 64 Q50 52 62 64 L62 92 Z" fill="#2c2114" opacity="0.55"/>
+  <!-- side windows -->
+  <rect x="20" y="58" width="11" height="13" rx="2" fill="#2c2114" opacity="0.42"/>
+  <rect x="69" y="58" width="11" height="13" rx="2" fill="#2c2114" opacity="0.42"/>
+  <rect x="12" y="86" width="76" height="6" fill="#000000" opacity="0.1"/>
 </svg>

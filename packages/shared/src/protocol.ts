@@ -9,6 +9,7 @@ import type {
   ResourceKind,
   UnitState,
   UnitType,
+  UpgradeId,
   Vec2,
 } from "./types";
 
@@ -49,6 +50,15 @@ export interface BuildingDTO {
   ty: number;
   hp: number;
   progress: number;
+  // The following are only populated for the viewing player's own buildings.
+  queue?: UnitType[];
+  produceTimer?: number; // ms left on the unit currently producing
+  produceMs?: number; // total train time of that unit (for a progress bar)
+  rallyX?: number;
+  rallyY?: number;
+  research?: UpgradeId | null; // upgrade in progress here
+  researchTimer?: number; // ms left on the current research
+  researchMs?: number; // total research time (for a progress bar)
 }
 
 export interface ResourceNodeDTO {
@@ -57,6 +67,8 @@ export interface ResourceNodeDTO {
   tx: number;
   ty: number;
   amount: number;
+  /** present for farm-hosted nodes: only this player may harvest it */
+  owner?: PlayerId;
 }
 
 export interface PlayerPublic {
@@ -77,6 +89,7 @@ export interface Snapshot {
     resources: Resources;
     pop: number;
     popCap: number;
+    upgrades: UpgradeId[];
   };
   units: UnitDTO[];
   buildings: BuildingDTO[];
@@ -89,14 +102,19 @@ export type Command =
   | { c: "move"; units: number[]; tile: Vec2 }
   | { c: "gather"; units: number[]; node: number }
   | { c: "build"; unit: number; building: BuildingType; tile: Vec2 }
+  | { c: "construct"; units: number[]; building: number }
   | { c: "train"; building: number; unit: UnitType }
+  | { c: "cancelTrain"; building: number }
+  | { c: "research"; building: number; upgrade: UpgradeId }
+  | { c: "rally"; building: number; tile: Vec2 }
   | { c: "attack"; units: number[]; target: number }
+  | { c: "attackMove"; units: number[]; tile: Vec2 }
   | { c: "stop"; units: number[] };
 
 // ---------- Client -> Server ----------
 
 export type ClientMessage =
-  | { t: "join"; name: string }
+  | { t: "join"; name: string; clientId?: string }
   | { t: "setColor"; color: string }
   | { t: "setReady"; ready: boolean }
   | { t: "startGame" }

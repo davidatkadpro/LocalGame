@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral base (wood/cloak/skin). Team colour is a separate accent layer. -->
+  <defs>
+    <linearGradient id="aCloak" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6f9657"/>
+      <stop offset="1" stop-color="#47633a"/>
+    </linearGradient>
+    <radialGradient id="aHead" cx="0.4" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#eebd84"/>
+      <stop offset="1" stop-color="#c98e4f"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="90" rx="22" ry="5" fill="#000000" opacity="0.2"/>
+  <!-- bow -->
+  <path d="M30 16 Q14 50 30 84" fill="none" stroke="#8a5a2b" stroke-width="5" stroke-linecap="round"/>
+  <line x1="30" y1="16" x2="30" y2="84" stroke="#000000" stroke-opacity="0.35" stroke-width="2"/>
+  <!-- arrow, nocked -->
+  <line x1="26" y1="50" x2="70" y2="50" stroke="#9a6a38" stroke-width="3"/>
+  <polygon points="74,50 66,46 66,54" fill="#cdd4db"/>
+  <!-- cloaked body -->
+  <path d="M34 92 C34 60 66 60 66 92 Z" fill="url(#aCloak)"/>
+  <path d="M34 74 q16 -8 32 0 l0 -7 q-16 -8 -32 0Z" fill="#000000" opacity="0.14"/>
+  <!-- quiver -->
+  <rect x="58" y="58" width="9" height="26" rx="3" fill="#7a5230" transform="rotate(18 62 70)"/>
+  <!-- head -->
+  <circle cx="50" cy="35" r="13" fill="url(#aHead)"/>
+</svg>

@@ -76,17 +76,70 @@ All randomness goes through a **seeded RNG** (`shared/src/rng.ts`) so map gen is
 - **M1 — core loop:** gather→deposit; build House (pop cap) + Barracks; train Worker + Soldier; combat + building destruction; win check; fog exploration; HUD wired.
 - **M2 — breadth & polish:** more units/buildings, upgrades/tech, minimap, audio, unit collision/formations, reconnect handling, packaged desktop host (Tauri/Electron) so the host needs no Node install.
 
-## What actually works in this scaffold
+## What works now (M0 + M1 in progress)
 
-The authoritative simulation already implements the full core loop: movement (A*),
-gather→deposit, construction, unit production, combat, building destruction, fog of
-war, pop cap, and the win check. The smoke test (`scripts/smoke.mjs`) drives two
-clients through join→ready→start→move and asserts the economy/fog/snapshots.
+The authoritative simulation implements the full core loop: movement (A*),
+gather→deposit→**return** (fixed: workers approach an adjacent tile, never trap
+themselves on a building interior), construction, unit production, combat,
+building destruction, fog of war, pop cap, rally points, unit separation, and the
+win check. Smoke tests (`scripts/smoke.mjs`, `scripts/smoke2.mjs`) drive two
+clients and assert the economy/fog, rally, queue visibility, cancel-refund, and
+separation.
 
-Client UX is intentionally minimal and is where M1 polish goes:
+M1 polish landed:
 
-- No build-placement ghost preview (you click to place; invalid spots are silently rejected by the server).
-- No HP bars / health overlays, no production-queue UI, no rally points.
-- No minimap, no audio, no unit collision/separation (units can overlap).
-- Training is wired to your Town Center (workers) and Barracks (soldiers) via HUD buttons rather than per-building selection.
-- Balance numbers in `shared/src/constants.ts` are first-pass guesses.
+- **Build-placement ghost preview** (green/red validity, mirrors server rule).
+- **HP bars** for damaged units and for buildings (and during construction).
+- **Touch reselection** fixed — tapping your own unit/building always selects it.
+- **Unit collision/separation** — soft spatial-hash separation, deterministic.
+- **Production-queue + building selection UI** — click a building for its queue, progress bar, train buttons, and cancel (with refund).
+- **Rally points** — select a building, right-click/tap the map to set where new units walk.
+- **Minimap** — explored terrain, entity dots, viewport rect, click-to-jump.
+- **Room reset** — a finished/abandoned game returns to a clean lobby.
+
+M2 batch landed:
+
+- **Audio/SFX** — procedural Web Audio (no binary assets): select, command, attack,
+  build, unit-ready, construction-complete, victory/defeat. Mute toggle in the HUD;
+  context resumed on first gesture (autoplay policy).
+- **Attack-move** — press **A** then click (or HUD button) to march a selection to a
+  point, auto-engaging any enemy seen en route and resuming the advance after each
+  kill. Sim: `aggro` target + `acquireTarget`/`resumeAggro`. Covered by
+  `scripts/attackmove.test.ts`.
+- **Control groups** — **Ctrl+1–9** assigns the current selection, **1–9** recalls
+  (double-tap to centre the camera on the group).
+- **Idle-worker cycling** — **.** (or the HUD button, which shows the idle count)
+  selects the next idle worker and centres on it.
+- **Graceful mid-game reconnect** — a stable per-browser `clientId` keeps the slot and
+  its units alive on a drop; the client auto-retries and the server resyncs it with a
+  fresh `gameStart` and resumed snapshots. Other players keep playing throughout.
+  Covered by `scripts/smoke3.mjs`.
+
+M2 batch-2 landed (breadth & polish):
+
+- **New unit — Archer**: fragile ranged unit (range 5), trained at the Barracks.
+  Costs food+wood (no gold gate) as the accessible ranged option.
+- **New building — Guard Tower**: static defense that auto-attacks the nearest
+  enemy in range. Built by a worker. Sim: `BuildingDef.attack` + `tickTowers`.
+- **Upgrades / tech**: research one-at-a-time per building, applied per player —
+  *Improved Tools* (worker gather +50%, at Town Center), *Sharpened Blades*
+  (+25% military damage) and *Padded Armor* (−25% damage taken), both at the
+  Barracks. Effective-stat helpers in `constants.ts`: `gatherRate`,
+  `unitDamage`, `incomingDamage`. HUD shows research buttons, progress, and
+  earned-upgrade badges.
+- **Balance pass**: faster early economy (gather 6/s, worker 5s), archer re-costed
+  to food+wood, soldier nudged up (110hp/13dmg) as the gold elite, tower hits
+  harder, shorter research times, +20 starting gold.
+- **Animations & visual polish**: directional facing, walk-bob, gather wobble,
+  attack-pulse, red hit-flash (units + buildings), death fade-out, animated
+  selection rings, and arrow projectiles for archers and towers.
+
+Tests: `scripts/smoke.mjs` (gather), `smoke2.mjs` (rally/queue/cancel/separation),
+`smoke3.mjs` (reconnect) over the network; `attackmove.test.ts` and `m2.test.ts`
+(research, upgrade effects, tower combat) drive the sim directly.
+
+Still open:
+
+- Packaged desktop host (Tauri/Electron) so the host needs no Node install.
+- Deeper tech tree, more unit/building types, formations.
+- Balance is a reasoned first pass — needs live multiplayer playtesting to tune.

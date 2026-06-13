@@ -1,7 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="50" cy="32" r="18" fill="#ffffff"/>
-  <rect x="44" y="14" width="12" height="14" rx="3" fill="#ffffff"/>
-  <path d="M26 92 C26 60 74 60 74 92 Z" fill="#ffffff"/>
-  <rect x="14" y="40" width="10" height="48" rx="4" fill="#ffffff"/>
-  <polygon points="76,46 92,52 76,58" fill="#ffffff"/>
+  <!-- Neutral base (steel/wood/skin). Team colour is a separate accent layer. -->
+  <defs>
+    <linearGradient id="sArmor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#cdd4db"/>
+      <stop offset="1" stop-color="#919aa3"/>
+    </linearGradient>
+    <radialGradient id="sHelm" cx="0.4" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#dfe4ea"/>
+      <stop offset="1" stop-color="#9aa3ac"/>
+    </radialGradient>
+    <radialGradient id="sShield" cx="0.4" cy="0.35" r="0.8">
+      <stop offset="0" stop-color="#cdd4db"/>
+      <stop offset="1" stop-color="#8a929b"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="90" rx="24" ry="5" fill="#000000" opacity="0.2"/>
+  <!-- spear -->
+  <rect x="80" y="14" width="5" height="76" rx="2" fill="#8a5a2b"/>
+  <polygon points="82.5,6 89,20 76,20" fill="#cdd4db"/>
+  <!-- body / armour -->
+  <path d="M28 92 C28 60 72 60 72 92 Z" fill="url(#sArmor)"/>
+  <path d="M28 70 q22 -10 44 0 l0 -8 q-22 -9 -44 0Z" fill="#000000" opacity="0.12"/>
+  <rect x="46" y="62" width="8" height="30" fill="#000000" opacity="0.1"/>
+  <!-- shield -->
+  <path d="M24 50 L24 70 Q24 84 38 90 Q52 84 52 70 L52 50 Z" fill="url(#sShield)" stroke="#000000" stroke-opacity="0.2" stroke-width="2"/>
+  <path d="M38 54 L38 86" stroke="#000000" stroke-opacity="0.18" stroke-width="2"/>
+  <!-- helmet -->
+  <circle cx="50" cy="32" r="17" fill="url(#sHelm)"/>
+  <path d="M33 32 a17 17 0 0 1 34 0 Z" fill="#000000" opacity="0.16"/>
+  <rect x="36" y="34" width="28" height="5" rx="2" fill="#000000" opacity="0.28"/>
 </svg>

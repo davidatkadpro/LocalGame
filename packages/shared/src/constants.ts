@@ -1,8 +1,10 @@
 ﻿import type {
   BuildingType,
+  Player,
   ResourceKind,
   Resources,
   UnitType,
+  UpgradeId,
 } from "./types";
 
 // ---- Simulation ----
@@ -20,9 +22,9 @@ export const MAP_WIDTH = 64;
 export const MAP_HEIGHT = 64;
 
 // ---- Economy ----
-export const STARTING_RESOURCES: Resources = { wood: 200, food: 200, gold: 100 };
+export const STARTING_RESOURCES: Resources = { wood: 200, food: 200, gold: 120 };
 export const CARRY_CAPACITY = 10; // units carry this much before returning
-export const GATHER_PER_SEC = 5; // resource units harvested per second
+export const GATHER_PER_SEC = 6; // resource units harvested per second
 
 export interface UnitDef {
   type: UnitType;
@@ -43,30 +45,46 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   worker: {
     type: "worker",
     hp: 40,
-    speed: 2.2,
+    speed: 2.3,
     sight: 5,
     cost: { food: 50 },
     popCost: 1,
-    trainMs: 6000,
+    trainMs: 5000,
     damage: 3,
-    range: 0.6,
+    range: 0.75, // must exceed unit separation (0.64) so melee can connect
     attackMs: 1200,
     trainedAt: "town_center",
   },
   soldier: {
     type: "soldier",
-    hp: 100,
+    hp: 110,
     speed: 1.9,
     sight: 6,
-    cost: { food: 60, gold: 20 },
+    cost: { food: 60, gold: 20 }, // gold-gated elite frontline
     popCost: 1,
     trainMs: 9000,
-    damage: 12,
+    damage: 13,
     range: 0.8,
     attackMs: 1000,
     trainedAt: "barracks",
   },
+  archer: {
+    type: "archer",
+    hp: 50,
+    speed: 2.0,
+    sight: 7,
+    cost: { food: 40, wood: 25 }, // accessible ranged unit (no gold gate)
+    popCost: 1,
+    trainMs: 8000,
+    damage: 9,
+    range: 5, // ranged: attacks from a distance
+    attackMs: 1400,
+    trainedAt: "barracks",
+  },
 };
+
+/** Unit types that count as military (for combat upgrades). */
+export const MILITARY: UnitType[] = ["soldier", "archer"];
 
 export interface BuildingDef {
   type: BuildingType;
@@ -78,6 +96,14 @@ export interface BuildingDef {
   providesPop: number;
   isDropOff: boolean; // can workers deposit resources here
   canTrain: UnitType[];
+  /** auto-attack stats for defensive buildings (towers) */
+  attack?: { damage: number; range: number; attackMs: number };
+  /** upgrades that can be researched here */
+  research?: UpgradeId[];
+  /** renewable food source: hosts a regenerating food node workers harvest */
+  farm?: { capacity: number; regenPerSec: number };
+  /** can a worker construct this from the build menu */
+  buildable: boolean;
 }
 
 export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
@@ -91,6 +117,8 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     providesPop: 5,
     isDropOff: true,
     canTrain: ["worker"],
+    research: ["improvedTools"],
+    buildable: false,
   },
   house: {
     type: "house",
@@ -102,6 +130,7 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     providesPop: 5,
     isDropOff: false,
     canTrain: [],
+    buildable: true,
   },
   barracks: {
     type: "barracks",
@@ -112,16 +141,129 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     buildMs: 20000,
     providesPop: 0,
     isDropOff: false,
-    canTrain: ["soldier"],
+    canTrain: ["soldier", "archer"],
+    research: ["sharpenedBlades", "paddedArmor"],
+    buildable: true,
+  },
+  tower: {
+    type: "tower",
+    hp: 500,
+    sight: 8,
+    size: { w: 2, h: 2 },
+    cost: { wood: 100, gold: 25 },
+    buildMs: 15000,
+    providesPop: 0,
+    isDropOff: false,
+    canTrain: [],
+    // Nerf: was 16 dmg / range 6 / 800ms (out-ranged archers and out-DPS'd
+    // soldiers). Now trades evenly with massed ranged units.
+    attack: { damage: 10, range: 5, attackMs: 1000 },
+    buildable: true,
+  },
+  storehouse: {
+    type: "storehouse",
+    hp: 250,
+    sight: 3,
+    size: { w: 2, h: 2 },
+    cost: { wood: 60 },
+    buildMs: 10000,
+    providesPop: 0,
+    isDropOff: true, // forward drop-off so far resource patches are worth working
+    canTrain: [],
+    buildable: true,
+  },
+  farm: {
+    type: "farm",
+    hp: 200,
+    sight: 2,
+    size: { w: 2, h: 2 },
+    cost: { wood: 80 },
+    buildMs: 14000,
+    providesPop: 0,
+    isDropOff: false,
+    canTrain: [],
+    // Hosts a food node that regenerates at ~one worker's gather rate, so a
+    // single farmer sustains it indefinitely; extra farmers drain it faster.
+    farm: { capacity: 250, regenPerSec: 6 },
+    buildable: true,
+  },
+  wall: {
+    type: "wall",
+    hp: 200,
+    sight: 1,
+    size: { w: 1, h: 1 },
+    cost: { wood: 10 },
+    buildMs: 3000,
+    providesPop: 0,
+    isDropOff: false,
+    canTrain: [],
+    buildable: true,
   },
 };
+
+export interface UpgradeDef {
+  id: UpgradeId;
+  name: string;
+  blurb: string;
+  cost: Partial<Resources>;
+  researchMs: number;
+  building: BuildingType;
+}
+
+export const UPGRADE_DEFS: Record<UpgradeId, UpgradeDef> = {
+  improvedTools: {
+    id: "improvedTools",
+    name: "Improved Tools",
+    blurb: "Workers gather +50% faster",
+    cost: { wood: 150, food: 100 },
+    researchMs: 20000,
+    building: "town_center",
+  },
+  sharpenedBlades: {
+    id: "sharpenedBlades",
+    name: "Sharpened Blades",
+    blurb: "Military units deal +25% damage",
+    cost: { food: 150, gold: 100 },
+    researchMs: 25000,
+    building: "barracks",
+  },
+  paddedArmor: {
+    id: "paddedArmor",
+    name: "Padded Armor",
+    blurb: "Military units take −25% damage",
+    cost: { wood: 150, gold: 100 },
+    researchMs: 25000,
+    building: "barracks",
+  },
+};
+
+// ---- effective stats (apply per-player upgrades) ----
+
+export function hasUpgrade(p: Player, id: UpgradeId): boolean {
+  return p.upgrades.includes(id);
+}
+
+export function gatherRate(p: Player): number {
+  return GATHER_PER_SEC * (hasUpgrade(p, "improvedTools") ? 1.5 : 1);
+}
+
+/** Damage a unit of `type` owned by `p` deals (before target armor). */
+export function unitDamage(p: Player, type: UnitType): number {
+  const base = UNIT_DEFS[type].damage;
+  return MILITARY.includes(type) && hasUpgrade(p, "sharpenedBlades") ? base * 1.25 : base;
+}
+
+/** Damage actually taken by a unit of `type` owned by `target`, after armor. */
+export function incomingDamage(target: Player, type: UnitType, dmg: number): number {
+  return MILITARY.includes(type) && hasUpgrade(target, "paddedArmor") ? dmg * 0.75 : dmg;
+}
 
 export const BASE_POP_CAP = 5;
 export const HARD_POP_CAP = 50;
 
 export const RESOURCE_NODE_AMOUNT: Record<ResourceKind, number> = {
-  wood: 250,
-  food: 150,
+  wood: 300,
+  food: 200,
   gold: 400,
 };
 

@@ -1,7 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect x="14" y="44" width="72" height="48" rx="4" fill="#ffffff"/>
-  <polygon points="8,46 50,12 92,46" fill="#ffffff"/>
-  <rect x="42" y="62" width="16" height="30" fill="#000000" opacity="0.25"/>
-  <rect x="22" y="54" width="14" height="14" fill="#000000" opacity="0.18"/>
-  <rect x="64" y="54" width="14" height="14" fill="#000000" opacity="0.18"/>
+  <!-- Neutral base (stone + timber roof). Banner is a separate accent layer. -->
+  <defs>
+    <linearGradient id="tcWall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dcd6c6"/>
+      <stop offset="1" stop-color="#aaa28c"/>
+    </linearGradient>
+    <linearGradient id="tcRoof" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9a6633"/>
+      <stop offset="1" stop-color="#6e4420"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="50" cy="94" rx="42" ry="5" fill="#000000" opacity="0.18"/>
+  <!-- corner towers -->
+  <rect x="10" y="50" width="16" height="42" rx="2" fill="url(#tcWall)"/>
+  <rect x="74" y="50" width="16" height="42" rx="2" fill="url(#tcWall)"/>
+  <polygon points="10,50 18,40 26,50" fill="url(#tcRoof)"/>
+  <polygon points="74,50 82,40 90,50" fill="url(#tcRoof)"/>
+  <!-- main hall -->
+  <rect x="22" y="46" width="56" height="46" rx="3" fill="url(#tcWall)"/>
+  <!-- big roof -->
+  <polygon points="16,48 50,16 84,48" fill="url(#tcRoof)"/>
+  <polygon points="50,16 84,48 50,48" fill="#000000" opacity="0.12"/>
+  <!-- flag pole -->
+  <rect x="48.5" y="6" width="3" height="14" fill="#7b7363"/>
+  <!-- door -->
+  <path d="M42 92 L42 70 Q50 60 58 70 L58 92 Z" fill="#3a2a18" opacity="0.55"/>
+  <!-- windows -->
+  <rect x="28" y="56" width="12" height="14" rx="2" fill="#3a2a18" opacity="0.4"/>
+  <rect x="60" y="56" width="12" height="14" rx="2" fill="#3a2a18" opacity="0.4"/>
+  <rect x="22" y="86" width="56" height="6" fill="#000000" opacity="0.12"/>
 </svg>

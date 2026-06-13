@@ -92,14 +92,31 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
     placeNode(s.x + 6, s.y + 5, "food");
   }
 
-  // Scatter extra resources across the map to fight over.
-  const scatter = Math.floor((width * height) / 90);
+  // Scatter extra resources across the map to fight over (denser than before).
+  const scatter = Math.floor((width * height) / 60);
   for (let i = 0; i < scatter; i++) {
     const x = rng.int(width);
     const y = rng.int(height);
     const roll = rng.next();
     const kind: ResourceKind = roll < 0.55 ? "wood" : roll < 0.8 ? "food" : "gold";
     placeNode(x, y, kind);
+  }
+
+  // A handful of dense "resource sites" — clusters worth expanding to and
+  // fighting over, rather than uniform scatter. Each is a single kind so a site
+  // reads as "the gold patch", "the woods", etc.
+  const sites = 5;
+  for (let i = 0; i < sites; i++) {
+    const cx = rng.range(10, width - 10);
+    const cy = rng.range(10, height - 10);
+    const roll = rng.next();
+    const kind: ResourceKind = roll < 0.45 ? "wood" : roll < 0.75 ? "food" : "gold";
+    const nodes = 4 + rng.int(3); // 4–6 nodes
+    for (let n = 0; n < nodes; n++) {
+      const x = Math.round(cx + rng.range(-2, 2));
+      const y = Math.round(cy + rng.range(-2, 2));
+      placeNode(x, y, kind);
+    }
   }
 
   return { map, resourceNodes, spawns, nextEntityId };

@@ -32,3 +32,16 @@ export function clamp(v: number, min: number, max: number): number {
   return v < min ? min : v > max ? max : v;
 }
 
+/** Whether integer tile (x, y) lies within the rect at (rx, ry) of size rw×rh.
+ *  The one true building-footprint test, shared by sim and client. */
+export function rectContains(
+  rx: number,
+  ry: number,
+  rw: number,
+  rh: number,
+  x: number,
+  y: number,
+): boolean {
+  return x >= rx && x < rx + rw && y >= ry && y < ry + rh;
+}
+

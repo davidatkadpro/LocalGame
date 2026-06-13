@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral base: a tilled field with rows of crops and a low fence.
+       Pennant is a separate accent layer. -->
+  <defs>
+    <linearGradient id="fSoil" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7a5a36"/>
+      <stop offset="1" stop-color="#5c4226"/>
+    </linearGradient>
+    <linearGradient id="fCrop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8fc24a"/>
+      <stop offset="1" stop-color="#5e9330"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="50" cy="93" rx="38" ry="5" fill="#000000" opacity="0.16"/>
+  <!-- field plot -->
+  <rect x="14" y="30" width="72" height="62" rx="3" fill="url(#fSoil)"/>
+  <!-- crop rows -->
+  <g fill="url(#fCrop)">
+    <rect x="20" y="36" width="60" height="7" rx="3"/>
+    <rect x="20" y="48" width="60" height="7" rx="3"/>
+    <rect x="20" y="60" width="60" height="7" rx="3"/>
+    <rect x="20" y="72" width="60" height="7" rx="3"/>
+  </g>
+  <!-- row furrow shadows -->
+  <g stroke="#3f2d18" stroke-width="1.2" opacity="0.5">
+    <line x1="20" y1="46.5" x2="80" y2="46.5"/>
+    <line x1="20" y1="58.5" x2="80" y2="58.5"/>
+    <line x1="20" y1="70.5" x2="80" y2="70.5"/>
+    <line x1="20" y1="82" x2="80" y2="82"/>
+  </g>
+  <!-- little fence posts along the front -->
+  <g fill="#9c7b4c">
+    <rect x="16" y="86" width="4" height="9" rx="1"/>
+    <rect x="40" y="86" width="4" height="9" rx="1"/>
+    <rect x="64" y="86" width="4" height="9" rx="1"/>
+    <rect x="80" y="86" width="4" height="9" rx="1"/>
+  </g>
+  <rect x="16" y="88" width="68" height="2.4" rx="1" fill="#b9966208"/>
+  <rect x="16" y="88.5" width="68" height="2.2" rx="1" fill="#8a6c41"/>
+  <!-- ridge pole for the pennant -->
+  <rect x="49" y="16" width="2.4" height="15" fill="#7b7363"/>
+</svg>

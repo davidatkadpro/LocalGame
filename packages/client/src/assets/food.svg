@@ -1,6 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <circle cx="36" cy="56" r="14" fill="#e03131"/>
-  <circle cx="60" cy="48" r="14" fill="#f03e3e"/>
-  <circle cx="58" cy="70" r="13" fill="#c92a2a"/>
-  <path d="M30 40 q8 -16 28 -12" stroke="#2f9e44" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <defs>
+    <radialGradient id="bush" cx="0.4" cy="0.3" r="0.85">
+      <stop offset="0" stop-color="#51cf66"/>
+      <stop offset="1" stop-color="#2b8a3e"/>
+    </radialGradient>
+    <radialGradient id="berry" cx="0.35" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#ff8787"/>
+      <stop offset="0.6" stop-color="#f03e3e"/>
+      <stop offset="1" stop-color="#c92a2a"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="90" rx="30" ry="5" fill="#000000" opacity="0.18"/>
+  <!-- bush -->
+  <circle cx="36" cy="62" r="20" fill="url(#bush)"/>
+  <circle cx="64" cy="60" r="20" fill="url(#bush)"/>
+  <circle cx="50" cy="50" r="20" fill="url(#bush)"/>
+  <circle cx="46" cy="44" r="6" fill="#b2f2bb" opacity="0.55"/>
+  <!-- berries -->
+  <circle cx="34" cy="58" r="9" fill="url(#berry)"/>
+  <circle cx="58" cy="50" r="10" fill="url(#berry)"/>
+  <circle cx="56" cy="70" r="9" fill="url(#berry)"/>
+  <circle cx="42" cy="72" r="7" fill="url(#berry)"/>
+  <!-- shines -->
+  <circle cx="31" cy="55" r="2.4" fill="#ffe3e3" opacity="0.9"/>
+  <circle cx="55" cy="46" r="2.6" fill="#ffe3e3" opacity="0.9"/>
+  <circle cx="53" cy="67" r="2.2" fill="#ffe3e3" opacity="0.85"/>
 </svg>

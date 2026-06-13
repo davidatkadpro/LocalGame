@@ -1,6 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <!-- White so it can be tinted with the player's colour -->
-  <circle cx="50" cy="34" r="18" fill="#ffffff"/>
-  <path d="M28 92 C28 64 72 64 72 92 Z" fill="#ffffff"/>
-  <rect x="60" y="20" width="8" height="40" rx="3" transform="rotate(35 64 40)" fill="#ffffff"/>
+  <!-- Neutral base (materials in true colour). Team colour is a separate accent layer. -->
+  <defs>
+    <linearGradient id="wTunic" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#caa066"/>
+      <stop offset="1" stop-color="#9c7740"/>
+    </linearGradient>
+    <radialGradient id="wHead" cx="0.4" cy="0.35" r="0.75">
+      <stop offset="0" stop-color="#eebd84"/>
+      <stop offset="1" stop-color="#c98e4f"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="90" rx="22" ry="5" fill="#000000" opacity="0.2"/>
+  <!-- pickaxe -->
+  <rect x="60" y="22" width="6" height="50" rx="3" transform="rotate(27 63 47)" fill="#8a5a2b"/>
+  <path d="M71 24 q13 -2 19 7 q-11 -2 -15 4 q-3 -8 -4 -11Z" fill="#aab2bb"/>
+  <path d="M71 24 q-13 -2 -19 7 q11 -2 15 4 q3 -8 4 -11Z" fill="#cdd4db"/>
+  <!-- tunic -->
+  <path d="M30 92 C30 62 70 62 70 92 Z" fill="url(#wTunic)"/>
+  <path d="M50 65 L50 92" stroke="#000000" stroke-opacity="0.12" stroke-width="2"/>
+  <!-- head -->
+  <circle cx="50" cy="34" r="17" fill="url(#wHead)"/>
+  <ellipse cx="44" cy="29" rx="4" ry="5" fill="#ffffff" opacity="0.35"/>
 </svg>

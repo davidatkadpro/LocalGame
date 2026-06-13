@@ -1,6 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect x="44" y="58" width="12" height="34" rx="3" fill="#7a4a23"/>
-  <circle cx="50" cy="44" r="26" fill="#2f9e44"/>
-  <circle cx="34" cy="52" r="16" fill="#37b24d"/>
-  <circle cx="66" cy="52" r="16" fill="#37b24d"/>
+  <defs>
+    <linearGradient id="trunk" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8a5a2b"/>
+      <stop offset="0.5" stop-color="#a06a33"/>
+      <stop offset="1" stop-color="#6e4420"/>
+    </linearGradient>
+    <radialGradient id="leafA" cx="0.4" cy="0.35" r="0.75">
+      <stop offset="0" stop-color="#51cf66"/>
+      <stop offset="1" stop-color="#2b8a3e"/>
+    </radialGradient>
+    <radialGradient id="leafB" cx="0.4" cy="0.35" r="0.8">
+      <stop offset="0" stop-color="#69db7c"/>
+      <stop offset="1" stop-color="#37b24d"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="92" rx="24" ry="5" fill="#000000" opacity="0.18"/>
+  <!-- trunk -->
+  <rect x="44" y="60" width="12" height="34" rx="3" fill="url(#trunk)"/>
+  <path d="M50 64 q-3 8 0 26" stroke="#000000" stroke-opacity="0.15" stroke-width="2" fill="none"/>
+  <!-- foliage -->
+  <circle cx="32" cy="54" r="17" fill="url(#leafB)"/>
+  <circle cx="68" cy="54" r="17" fill="url(#leafB)"/>
+  <circle cx="50" cy="42" r="26" fill="url(#leafA)"/>
+  <circle cx="40" cy="38" r="15" fill="url(#leafB)"/>
+  <!-- highlights -->
+  <circle cx="44" cy="34" r="6" fill="#b2f2bb" opacity="0.7"/>
+  <circle cx="60" cy="48" r="4" fill="#b2f2bb" opacity="0.5"/>
 </svg>
