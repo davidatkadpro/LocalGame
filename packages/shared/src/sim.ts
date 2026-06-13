@@ -589,6 +589,23 @@ function acquireTarget(world: World, u: Unit): EntityId | null {
   return best;
 }
 
+/** Nearest enemy *unit* (not building) within this unit's sight, or null. Used
+ *  to keep a player-issued attacker swinging onto the next foe after a kill. */
+function nearestEnemyUnit(world: World, u: Unit): EntityId | null {
+  const sight = UNIT_DEFS[u.type].sight;
+  let best: EntityId | null = null;
+  let bestD = sight;
+  for (const e of world.units) {
+    if (sameTeam(world, e.owner, u.owner) || e.hp <= 0) continue;
+    const d = dist(u.pos, e.pos);
+    if (d < bestD) {
+      bestD = d;
+      best = e.id;
+    }
+  }
+  return best;
+}
+
 function tileCenterOf(tile: Vec2): Vec2 {
   return { x: Math.floor(tile.x) + 0.5, y: Math.floor(tile.y) + 0.5 };
 }
@@ -1255,6 +1272,19 @@ function doAttack(world: World, u: Unit): void {
     u.targetEntity = null;
     // Re-acquire the next foe (or march on) if this was an attack-move.
     if (resumeAggro(world, u)) return;
+    // Player-issued attack (not leashed retaliation): having felled its target,
+    // the unit keeps fighting — it swings onto the nearest enemy unit still in
+    // sight so a melee scrum doesn't stall after each kill. Bounded to sight, so
+    // it falls idle once no foes remain nearby.
+    if (!isRetaliation(u)) {
+      const next = nearestEnemyUnit(world, u);
+      if (next !== null) {
+        u.targetEntity = next;
+        u.state = "attacking";
+        u.path = [];
+        return;
+      }
+    }
     u.state = "idle";
     return;
   }

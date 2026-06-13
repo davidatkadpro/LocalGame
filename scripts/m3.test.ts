@@ -456,5 +456,29 @@ function findOpenBlock(world: ReturnType<typeof createWorld>, size: number): { x
   }
 }
 
+// ---- 13. continuous attack: after a kill, swing onto the next nearby foe -----
+{
+  const world = createWorld(7, PS);
+  const fog = createFog(world);
+  const atk = world.units.find((u) => u.owner === 0)!;
+  const foe1 = world.units.find((u) => u.owner === 1)!;
+  atk.type = "soldier"; atk.hp = UNIT_DEFS.soldier.hp; atk.pos = { x: 30, y: 30 };
+  foe1.type = "archer"; foe1.hp = 1; foe1.pos = { x: 30.7, y: 30 }; // dies in one blow
+  const foe2 = { ...foe1, id: world.nextEntityId++, hp: UNIT_DEFS.archer.hp, pos: { x: 30, y: 30.7 } };
+  world.units = [atk, foe1, foe2];
+
+  applyCommand(world, 0, { c: "attack", units: [atk.id], target: foe1.id });
+  for (let i = 0; i < 20; i++) tick(world, fog);
+
+  check("the first foe is killed", !world.units.some((u) => u.id === foe1.id));
+  check(
+    "attacker auto-switches to the next enemy in sight",
+    atk.state === "attacking" && atk.targetEntity === foe2.id,
+    `state=${atk.state} target=${atk.targetEntity} foe2=${foe2.id}`,
+  );
+  const f2 = world.units.find((u) => u.id === foe2.id);
+  check("the next foe is now taking damage", !!f2 && f2.hp < UNIT_DEFS.archer.hp);
+}
+
 console.log(pass ? "M3: PASS ✅" : "M3: FAIL ❌");
 process.exit(pass ? 0 : 1);
