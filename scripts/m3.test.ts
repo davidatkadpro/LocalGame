@@ -3,6 +3,7 @@
 // formation moves (a group sent to one tile spreads into a block and every unit
 // arrives instead of stacking/jamming). Drives the sim directly — no network.
 import {
+  BUILDING_DEFS,
   UNIT_DEFS,
   applyCommand,
   createFog,
@@ -478,6 +479,44 @@ function findOpenBlock(world: ReturnType<typeof createWorld>, size: number): { x
   );
   const f2 = world.units.find((u) => u.id === foe2.id);
   check("the next foe is now taking damage", !!f2 && f2.hp < UNIT_DEFS.archer.hp);
+}
+
+// ---- 14. demolish: tear down a building for a 50% refund -------------------
+{
+  const world = createWorld(7, [PS[0]]);
+  const tc = world.buildings.find((b) => b.owner === 0 && b.type === "town_center")!;
+  const woodBefore = world.players[0].resources.wood;
+  applyCommand(world, 0, { c: "demolish", building: tc.id });
+  check("demolished building is removed", !world.buildings.some((b) => b.id === tc.id));
+  check(
+    "demolish refunds 50% of the cost",
+    world.players[0].resources.wood === woodBefore + Math.floor((BUILDING_DEFS.town_center.cost.wood ?? 0) * 0.5),
+    `wood ${woodBefore} -> ${world.players[0].resources.wood}`,
+  );
+}
+// ---- 14b. demolishing a farm also removes its hosted food node -------------
+{
+  const world = createWorld(7, [PS[0]]);
+  const node = { id: world.nextEntityId++, kind: "food" as const, tile: { x: 12, y: 12 }, amount: 100, owner: 0 };
+  world.resourceNodes.push(node);
+  world.buildings.push({
+    id: world.nextEntityId++,
+    owner: 0,
+    type: "farm" as const,
+    tile: { x: 12, y: 12 },
+    hp: 200,
+    progress: 1,
+    queue: [],
+    produceTimer: 0,
+    rally: null,
+    research: null,
+    researchTimer: 0,
+    attackCooldown: 0,
+    farmNodeId: node.id,
+  });
+  const farm = world.buildings.find((b) => b.farmNodeId === node.id)!;
+  applyCommand(world, 0, { c: "demolish", building: farm.id });
+  check("demolishing a farm removes its hosted food node", !world.resourceNodes.some((n) => n.id === node.id));
 }
 
 console.log(pass ? "M3: PASS ✅" : "M3: FAIL ❌");

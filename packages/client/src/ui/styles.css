@@ -358,6 +358,15 @@ button.primary:hover:not(:disabled) {
   gap: 6px;
   flex-wrap: wrap;
 }
+.demolish-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 6px;
+}
 .queue {
   display: flex;
   align-items: center;

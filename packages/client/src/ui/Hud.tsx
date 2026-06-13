@@ -510,7 +510,11 @@ function BuildingPanel({
   owned: UpgradeId[];
 }) {
   const command = useStore((s) => s.command);
+  const [confirmDemolish, setConfirmDemolish] = useState(false);
+  // Reset the demolish confirmation whenever a different building is selected.
+  useEffect(() => setConfirmDemolish(false), [building.id]);
   const def = BUILDING_DEFS[building.type as BuildingType];
+  const label = BUILDING_LABEL[building.type as BuildingType];
   const built = building.progress >= 1;
   const queue = building.queue ?? [];
   const trainProgress =
@@ -525,7 +529,7 @@ function BuildingPanel({
 
   return (
     <div className="panel">
-      <div className="panel-title">{BUILDING_LABEL[building.type as BuildingType]}</div>
+      <div className="panel-title">{label}</div>
 
       {!built && (
         <div className="small muted">Under construction… {Math.round(building.progress * 100)}%</div>
@@ -601,6 +605,32 @@ function BuildingPanel({
       {built && (def.canTrain.length > 0 || building.type === "barracks") && (
         <div className="small muted">Right-click / tap map to set rally.</div>
       )}
+
+      <div className="demolish-row">
+        {confirmDemolish ? (
+          <>
+            <span className="small muted">Demolish {label}? (50% refund)</span>
+            <button
+              className="danger"
+              onClick={() => {
+                command({ c: "demolish", building: building.id });
+                setConfirmDemolish(false);
+              }}
+            >
+              Yes, demolish
+            </button>
+            <button onClick={() => setConfirmDemolish(false)}>Cancel</button>
+          </>
+        ) : (
+          <button
+            className="danger"
+            onClick={() => setConfirmDemolish(true)}
+            title="Tear this building down and reclaim half its cost"
+          >
+            🧨 Demolish
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -424,6 +424,32 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
       }
       break;
     }
+    case "demolish": {
+      const b = buildingById(world, cmd.building);
+      if (!b || b.owner !== playerId) break;
+      const cost = BUILDING_DEFS[b.type].cost;
+      // Reclaim half the materials (rounded down) — rewards fixing a misplaced
+      // building without making demolish-and-rebuild cycles free.
+      player.resources.wood += Math.floor((cost.wood ?? 0) * 0.5);
+      player.resources.food += Math.floor((cost.food ?? 0) * 0.5);
+      player.resources.gold += Math.floor((cost.gold ?? 0) * 0.5);
+      // A farm takes its hosted food node down with it.
+      if (b.farmNodeId != null) {
+        world.resourceNodes = world.resourceNodes.filter((n) => n.id !== b.farmNodeId);
+      }
+      world.buildings = world.buildings.filter((x) => x.id !== b.id);
+      // Release any of our units that were building or walking to it.
+      for (const u of world.units) {
+        if (u.owner === playerId && u.targetEntity === b.id) {
+          u.targetEntity = null;
+          if (u.state === "building" || u.state === "moving") {
+            u.state = "idle";
+            u.path = [];
+          }
+        }
+      }
+      break;
+    }
     case "concede": {
       player.conceded = true; // resolved by updateWinState next tick
       break;

@@ -123,6 +123,7 @@ export type Command =
   | { c: "attack"; units: number[]; target: number; queue?: boolean }
   | { c: "attackMove"; units: number[]; tile: Vec2; queue?: boolean }
   | { c: "stop"; units: number[] }
+  | { c: "demolish"; building: number }
   | { c: "concede" };
 
 // ---------- Client -> Server ----------
