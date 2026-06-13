@@ -83,6 +83,12 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
     });
   };
 
+  // Keep scattered/grove resources out of each spawn's clear zone so a town
+  // center never lands on a node and the opening stays uncluttered. Starter
+  // resources are placed deliberately and bypass this.
+  const nearSpawn = (x: number, y: number) =>
+    spawns.some((s) => x >= s.x - 4 && x <= s.x + 7 && y >= s.y - 4 && y <= s.y + 7);
+
   // Starter resources next to each spawn so the early economy works immediately.
   for (const s of spawns) {
     for (let i = 0; i < 6; i++) placeNode(s.x + 4 + (i % 3), s.y - 2 + Math.floor(i / 3), "wood");
@@ -93,13 +99,34 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
   }
 
   // Scatter extra resources across the map to fight over (denser than before).
-  const scatter = Math.floor((width * height) / 60);
+  const scatter = Math.floor((width * height) / 50);
   for (let i = 0; i < scatter; i++) {
     const x = rng.int(width);
     const y = rng.int(height);
+    if (nearSpawn(x, y)) continue;
     const roll = rng.next();
-    const kind: ResourceKind = roll < 0.55 ? "wood" : roll < 0.8 ? "food" : "gold";
+    const kind: ResourceKind = roll < 0.6 ? "wood" : roll < 0.82 ? "food" : "gold";
     placeNode(x, y, kind);
+  }
+
+  // Dense forests: roundish wood groves so the map reads as having real woods to
+  // harvest and manoeuvre through (forest tiles are walkable), not just sparse
+  // single trees. Gaps are left so a grove isn't a solid wall.
+  const groves = 6;
+  for (let i = 0; i < groves; i++) {
+    const cx = rng.range(8, width - 8);
+    const cy = rng.range(8, height - 8);
+    const r = rng.range(2.2, 3.6);
+    for (let y = Math.floor(cy - r); y <= cy + r; y++) {
+      for (let x = Math.floor(cx - r); x <= cx + r; x++) {
+        const dx = x - cx;
+        const dy = y - cy;
+        if (dx * dx + dy * dy > r * r) continue;
+        if (nearSpawn(x, y)) continue;
+        if (rng.next() < 0.28) continue; // ~72% of grove tiles get a tree
+        placeNode(x, y, "wood");
+      }
+    }
   }
 
   // A handful of dense "resource sites" — clusters worth expanding to and
@@ -115,6 +142,7 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
     for (let n = 0; n < nodes; n++) {
       const x = Math.round(cx + rng.range(-2, 2));
       const y = Math.round(cy + rng.range(-2, 2));
+      if (nearSpawn(x, y)) continue;
       placeNode(x, y, kind);
     }
   }
