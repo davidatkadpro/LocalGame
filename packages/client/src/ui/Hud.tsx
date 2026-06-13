@@ -1,5 +1,12 @@
-import { useState } from "react";
-import type { BuildingDTO, BuildingType, Resources, UnitType, UpgradeId } from "@bg/shared";
+import { useEffect, useRef, useState } from "react";
+import type {
+  BuildingDTO,
+  BuildingType,
+  EntityId,
+  Resources,
+  UnitType,
+  UpgradeId,
+} from "@bg/shared";
 import { BUILDING_DEFS, UNIT_DEFS, UPGRADE_DEFS, canAfford } from "@bg/shared";
 import { useStore } from "../net/store";
 import { isMuted, toggleMuted } from "../game/audio";
@@ -9,6 +16,9 @@ interface HudProps {
   onAttackMove: () => void;
   onIdleWorker: () => void;
   onSelectMode: () => void;
+  isMobile: boolean;
+  minimapOpen: boolean;
+  onToggleMinimap: () => void;
 }
 
 const UNIT_LABEL: Record<UnitType, string> = {
@@ -28,7 +38,17 @@ const BUILDING_LABEL: Record<BuildingType, string> = {
 
 const BUILDABLE = Object.values(BUILDING_DEFS).filter((d) => d.buildable);
 
-export function Hud({ onPlace, onAttackMove, onIdleWorker, onSelectMode }: HudProps) {
+type MobileTab = "build" | "commands" | "selection" | "controls";
+
+export function Hud({
+  onPlace,
+  onAttackMove,
+  onIdleWorker,
+  onSelectMode,
+  isMobile,
+  minimapOpen,
+  onToggleMinimap,
+}: HudProps) {
   const snap = useStore((s) => s.curr);
   const selectedUnits = useStore((s) => s.selectedUnits);
   const selectedBuilding = useStore((s) => s.selectedBuilding);
@@ -79,85 +99,306 @@ export function Hud({ onPlace, onAttackMove, onIdleWorker, onSelectMode }: HudPr
         </button>
       </div>
 
-      <div className="hud-bottom">
-        <div className="panel">
-          <div className="panel-title">Build</div>
-          {BUILDABLE.map((d) => (
-            <button key={d.type} onClick={() => onPlace(d.type)}>
-              {BUILDING_LABEL[d.type]} <CostBadge cost={d.cost} />
-            </button>
-          ))}
+      {isMobile ? (
+        <MobileBottom
+          onPlace={onPlace}
+          onAttackMove={onAttackMove}
+          onIdleWorker={onIdleWorker}
+          onSelectMode={onSelectMode}
+          selectArmed={selectArmed}
+          selectedCount={selectedUnits.length}
+          idleWorkers={idleWorkers}
+          building={building}
+          selectedBuilding={selectedBuilding}
+          res={res}
+          upgrades={upgrades}
+          minimapOpen={minimapOpen}
+          onToggleMinimap={onToggleMinimap}
+        />
+      ) : (
+        <div className="hud-bottom">
+          <BuildPanelView onPlace={onPlace} />
+          <CommandsPanelView
+            selectArmed={selectArmed}
+            onSelectMode={onSelectMode}
+            onAttackMove={onAttackMove}
+            selectedCount={selectedUnits.length}
+            onIdleWorker={onIdleWorker}
+            idleWorkers={idleWorkers}
+          />
+          <SelectionPanelView
+            building={building}
+            res={res}
+            upgrades={upgrades}
+            selectedCount={selectedUnits.length}
+          />
+          <ControlsPanelView showControls={showControls} setControls={setControls} />
         </div>
-
-        <div className="panel">
-          <div className="panel-title">Commands</div>
-          <button
-            className={selectArmed ? "armed" : ""}
-            onClick={onSelectMode}
-            title="Then drag a box on the map to select multiple units (touch)"
-          >
-            {selectArmed ? "▣ Drag to select…" : "▣ Box select"}
-          </button>
-          <button onClick={onAttackMove} disabled={selectedUnits.length === 0}>
-            ⚔ Attack-move <span className="muted small">(A)</span>
-          </button>
-          <button onClick={onIdleWorker} disabled={idleWorkers === 0}>
-            💤 Idle worker{idleWorkers > 0 ? ` (${idleWorkers})` : ""} <span className="muted small">(.)</span>
-          </button>
-        </div>
-
-        {building ? (
-          <BuildingPanel building={building} resources={res} owned={upgrades} />
-        ) : (
-          <div className="panel">
-            <div className="panel-title">Selection</div>
-            <div className="small muted">
-              {selectedUnits.length > 0
-                ? `${selectedUnits.length} unit${selectedUnits.length > 1 ? "s" : ""} selected`
-                : "Nothing selected"}
-            </div>
-            <div className="small muted">Select a building to train units or research upgrades.</div>
-          </div>
-        )}
-
-        {showControls ? (
-        <div className="panel hint">
-          <div className="panel-title hint-head">
-            <span>Controls</span>
-            <button
-              className="panel-close"
-              onClick={() => setControls(false)}
-              title="Hide controls"
-              aria-label="Hide controls"
-            >
-              ×
-            </button>
-          </div>
-          <div className="small muted">
-            Drag-select / click your units. Right-click (or tap) to move, gather, or attack.
-            Press <b>A</b> then click for attack-move; <b>.</b> cycles idle workers.
-            <b> Ctrl+1–9</b> sets a control group, <b>1–9</b> recalls it (double-tap to centre).
-            Select a building, then right-click/tap to set its rally point.
-            Pick <b>Wall</b> (with a worker selected) and drag to build a line.
-            Arrow keys / drag to pan, wheel / pinch to zoom.
-            <br />
-            <b>Touch:</b> tap <b>▣ Box select</b> then drag to marquee units;
-            double-tap a unit to grab all of its type on screen; long-press to
-            issue a command (e.g. send a worker to finish a building).
-          </div>
-        </div>
-        ) : (
-          <button
-            className="hint-reopen"
-            onClick={() => setControls(true)}
-            title="Show controls"
-            aria-label="Show controls"
-          >
-            ?
-          </button>
-        )}
-      </div>
+      )}
     </>
+  );
+}
+
+/* ---------- Panel views (shared by desktop row and mobile drawer) ---------- */
+
+function BuildPanelView({ onPlace }: { onPlace: (b: BuildingType) => void }) {
+  return (
+    <div className="panel panel-build">
+      <div className="panel-title">Build</div>
+      {BUILDABLE.map((d) => (
+        <button key={d.type} onClick={() => onPlace(d.type)}>
+          {BUILDING_LABEL[d.type]} <CostBadge cost={d.cost} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CommandsPanelView({
+  selectArmed,
+  onSelectMode,
+  onAttackMove,
+  selectedCount,
+  onIdleWorker,
+  idleWorkers,
+}: {
+  selectArmed: boolean;
+  onSelectMode: () => void;
+  onAttackMove: () => void;
+  selectedCount: number;
+  onIdleWorker: () => void;
+  idleWorkers: number;
+}) {
+  return (
+    <div className="panel">
+      <div className="panel-title">Commands</div>
+      <button
+        className={selectArmed ? "armed" : ""}
+        onClick={onSelectMode}
+        title="Then drag a box on the map to select multiple units (touch)"
+      >
+        {selectArmed ? "▣ Drag to select…" : "▣ Box select"}
+      </button>
+      <button onClick={onAttackMove} disabled={selectedCount === 0}>
+        ⚔ Attack-move <span className="muted small">(A)</span>
+      </button>
+      <button onClick={onIdleWorker} disabled={idleWorkers === 0}>
+        💤 Idle worker{idleWorkers > 0 ? ` (${idleWorkers})` : ""}{" "}
+        <span className="muted small">(.)</span>
+      </button>
+    </div>
+  );
+}
+
+function SelectionPanelView({
+  building,
+  res,
+  upgrades,
+  selectedCount,
+}: {
+  building: BuildingDTO | null;
+  res: Resources;
+  upgrades: UpgradeId[];
+  selectedCount: number;
+}) {
+  if (building) {
+    return <BuildingPanel building={building} resources={res} owned={upgrades} />;
+  }
+  return (
+    <div className="panel">
+      <div className="panel-title">Selection</div>
+      <div className="small muted">
+        {selectedCount > 0
+          ? `${selectedCount} unit${selectedCount > 1 ? "s" : ""} selected`
+          : "Nothing selected"}
+      </div>
+      <div className="small muted">Select a building to train units or research upgrades.</div>
+    </div>
+  );
+}
+
+function ControlsText() {
+  return (
+    <div className="small muted">
+      Drag-select / click your units. Right-click (or tap) to move, gather, or attack. Press{" "}
+      <b>A</b> then click for attack-move; <b>.</b> cycles idle workers.
+      <b> Ctrl+1–9</b> sets a control group, <b>1–9</b> recalls it (double-tap to centre). Select a
+      building, then right-click/tap to set its rally point. Pick <b>Wall</b> (with a worker
+      selected) and drag to build a line. Arrow keys / drag to pan, wheel / pinch to zoom.
+      <br />
+      <b>Touch:</b> tap <b>▣ Box select</b> then drag to marquee units; double-tap a unit to grab
+      all of its type on screen; long-press to issue a command (e.g. send a worker to finish a
+      building).
+    </div>
+  );
+}
+
+function ControlsPanelView({
+  showControls,
+  setControls,
+}: {
+  showControls: boolean;
+  setControls: (show: boolean) => void;
+}) {
+  if (!showControls) {
+    return (
+      <button
+        className="hint-reopen"
+        onClick={() => setControls(true)}
+        title="Show controls"
+        aria-label="Show controls"
+      >
+        ?
+      </button>
+    );
+  }
+  return (
+    <div className="panel hint">
+      <div className="panel-title hint-head">
+        <span>Controls</span>
+        <button
+          className="panel-close"
+          onClick={() => setControls(false)}
+          title="Hide controls"
+          aria-label="Hide controls"
+        >
+          ×
+        </button>
+      </div>
+      <ControlsText />
+    </div>
+  );
+}
+
+/* ---------- Mobile tabbed bottom HUD ---------- */
+
+function MobileBottom({
+  onPlace,
+  onAttackMove,
+  onIdleWorker,
+  onSelectMode,
+  selectArmed,
+  selectedCount,
+  idleWorkers,
+  building,
+  selectedBuilding,
+  res,
+  upgrades,
+  minimapOpen,
+  onToggleMinimap,
+}: {
+  onPlace: (b: BuildingType) => void;
+  onAttackMove: () => void;
+  onIdleWorker: () => void;
+  onSelectMode: () => void;
+  selectArmed: boolean;
+  selectedCount: number;
+  idleWorkers: number;
+  building: BuildingDTO | null;
+  selectedBuilding: EntityId | null;
+  res: Resources;
+  upgrades: UpgradeId[];
+  minimapOpen: boolean;
+  onToggleMinimap: () => void;
+}) {
+  const [tab, setTab] = useState<MobileTab | null>(null);
+
+  // Auto-open the Selection drawer when a building gets selected, so training
+  // and research controls surface without an extra tap.
+  const prevBuilding = useRef(selectedBuilding);
+  useEffect(() => {
+    if (selectedBuilding !== null && selectedBuilding !== prevBuilding.current) {
+      setTab("selection");
+    }
+    prevBuilding.current = selectedBuilding;
+  }, [selectedBuilding]);
+
+  const toggle = (t: MobileTab) => setTab((cur) => (cur === t ? null : t));
+
+  const selLabel = building
+    ? BUILDING_LABEL[building.type as BuildingType]
+    : selectedCount > 0
+      ? `${selectedCount} sel`
+      : "Select";
+
+  return (
+    <div className="hud-mobile">
+      {tab && (
+        <div className="hud-drawer">
+          {tab === "build" && <BuildPanelView onPlace={onPlace} />}
+          {tab === "commands" && (
+            <CommandsPanelView
+              selectArmed={selectArmed}
+              onSelectMode={onSelectMode}
+              onAttackMove={onAttackMove}
+              selectedCount={selectedCount}
+              onIdleWorker={onIdleWorker}
+              idleWorkers={idleWorkers}
+            />
+          )}
+          {tab === "selection" && (
+            <SelectionPanelView
+              building={building}
+              res={res}
+              upgrades={upgrades}
+              selectedCount={selectedCount}
+            />
+          )}
+          {tab === "controls" && (
+            <div className="panel hint">
+              <div className="panel-title">Controls</div>
+              <ControlsText />
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="hud-tabs">
+        <TabButton emoji="🔨" label="Build" active={tab === "build"} onClick={() => toggle("build")} />
+        <TabButton
+          emoji="⚔"
+          label="Cmd"
+          active={tab === "commands"}
+          badge={idleWorkers > 0 ? idleWorkers : undefined}
+          onClick={() => toggle("commands")}
+        />
+        <TabButton
+          emoji="🎯"
+          label={selLabel}
+          active={tab === "selection"}
+          onClick={() => toggle("selection")}
+        />
+        <TabButton emoji="🗺" label="Map" active={minimapOpen} onClick={onToggleMinimap} />
+        <TabButton
+          emoji="❔"
+          label="Help"
+          active={tab === "controls"}
+          onClick={() => toggle("controls")}
+        />
+      </div>
+    </div>
+  );
+}
+
+function TabButton({
+  emoji,
+  label,
+  active,
+  badge,
+  onClick,
+}: {
+  emoji: string;
+  label: string;
+  active: boolean;
+  badge?: number;
+  onClick: () => void;
+}) {
+  return (
+    <button className={`hud-tab ${active ? "active" : ""}`} onClick={onClick}>
+      <span className="tab-icon">{emoji}</span>
+      <span className="tab-label">{label}</span>
+      {badge !== undefined && <em className="tab-badge">{badge}</em>}
+    </button>
   );
 }
 

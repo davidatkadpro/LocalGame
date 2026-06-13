@@ -359,3 +359,201 @@ button.cancel {
   border-top: 1px solid #2c333d;
   padding-top: 6px;
 }
+
+/* ---- small screens / mobile (Tier 1: responsive layout) ----
+   The HUD is desktop-fixed by default; on narrow viewports the bottom panels
+   overflow, the minimap covers the top bar, and tap targets shrink. These rules
+   reflow the chrome to fit a phone without touching component logic. */
+@media (max-width: 600px) {
+  /* Top resource bar: pin across the top-left, leave room for the minimap on
+     the right, and let it wrap instead of clipping when upgrades appear. */
+  .hud-top {
+    left: 8px;
+    right: 124px;
+    transform: none;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  .res {
+    font-size: 13px;
+    gap: 4px;
+  }
+
+  /* Minimap: shrink so it stops covering the resource bar and the map. */
+  .minimap {
+    width: 108px;
+    height: 108px;
+  }
+
+  /* Compact every panel on small screens (applies to the desktop fallback row
+     and the mobile drawer alike). */
+  .panel {
+    min-width: 0;
+    padding: 6px 8px;
+    gap: 4px;
+  }
+  /* Desktop-layout fallback (when JS/matchMedia is unavailable): wrap the
+     bottom panels two-up instead of crushing them into one row. The mobile
+     tabbed HUD (.hud-mobile) replaces this on real phones. */
+  .hud-bottom {
+    left: 6px;
+    right: 6px;
+    bottom: 6px;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .hud-bottom .panel {
+    flex: 1 1 calc(50% - 6px);
+  }
+  .hud-bottom .panel.hint {
+    flex-basis: 100%;
+    max-width: none;
+    margin-left: 0;
+    font-size: 11px;
+  }
+
+  /* Build list: 2-column grid cuts the panel's height roughly in half. */
+  .panel-build {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-content: start;
+  }
+  .panel-build .panel-title {
+    grid-column: 1 / -1;
+  }
+  .panel-build button {
+    font-size: 12px;
+    padding: 8px 6px;
+  }
+
+  /* Touch targets: keep interactive controls reachable with a thumb. */
+  .hud-bottom button,
+  .hud-drawer button,
+  .hud-top .icon-btn {
+    min-height: 40px;
+  }
+  .hint-reopen {
+    width: 40px;
+    height: 40px;
+  }
+  .panel-close {
+    padding: 4px 10px;
+  }
+
+  /* Cards (lobby / game-over) must not exceed the viewport width. */
+  .card,
+  .card.wide {
+    min-width: 0;
+    width: min(92vw, 460px);
+    padding: 22px 20px;
+  }
+}
+
+/* Landscape phones: very short viewports — trim vertical padding so the map
+   isn't buried under the top and bottom chrome. */
+@media (max-height: 480px) and (max-width: 900px) {
+  .hud-top {
+    top: 6px;
+    padding: 4px 10px;
+  }
+  .hud-bottom {
+    bottom: 6px;
+  }
+  .panel {
+    padding: 5px 8px;
+    gap: 3px;
+  }
+  .panel.hint {
+    font-size: 11px;
+  }
+  .minimap {
+    width: 104px;
+    height: 104px;
+  }
+}
+
+/* ---- Mobile tabbed HUD (Tier 2) ----
+   Only rendered when useIsMobile() is true, so these rules need no media query.
+   A fixed tab bar pins to the bottom; tapping a tab slides one panel up in the
+   drawer. Empty space above the drawer stays transparent to input so map taps
+   fall through (mirrors the .hud-bottom pointer-events model). */
+.hud-mobile {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+.hud-drawer {
+  pointer-events: auto;
+  padding: 6px 6px 0;
+  max-height: 52vh;
+  overflow-y: auto;
+}
+.hud-drawer .panel {
+  margin: 0;
+}
+
+.hud-tabs {
+  pointer-events: auto;
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
+  background: rgba(13, 15, 18, 0.92);
+  border-top: 1px solid #2c333d;
+  backdrop-filter: blur(4px);
+}
+.hud-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 2px;
+  min-height: 50px;
+  line-height: 1;
+  position: relative;
+}
+.hud-tab .tab-icon {
+  font-size: 18px;
+}
+.hud-tab .tab-label {
+  font-size: 10px;
+  color: var(--muted);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hud-tab.active {
+  background: #2c333d;
+  border-color: var(--accent);
+}
+.hud-tab.active .tab-label {
+  color: var(--text);
+}
+.tab-badge {
+  position: absolute;
+  top: 3px;
+  right: 8px;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 9px;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  padding: 0 4px;
+}

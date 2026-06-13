@@ -1,12 +1,17 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BuildingType } from "@bg/shared";
 import { PixiGame } from "../game/PixiGame";
 import { Hud } from "./Hud";
 import { Minimap } from "./Minimap";
+import { useIsMobile } from "./useIsMobile";
 
 export function Game() {
   const hostRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<PixiGame | null>(null);
+  const isMobile = useIsMobile();
+  // On phones the minimap is hidden behind a tab toggle to reclaim screen; on
+  // desktop it is always shown.
+  const [minimapOpen, setMinimapOpen] = useState(false);
 
   useEffect(() => {
     const g = new PixiGame();
@@ -27,12 +32,15 @@ export function Game() {
   return (
     <div className="game">
       <div className="canvas-host" ref={hostRef} />
-      <Minimap getViewport={getViewport} />
+      {(!isMobile || minimapOpen) && <Minimap getViewport={getViewport} />}
       <Hud
         onPlace={onPlace}
         onAttackMove={onAttackMove}
         onIdleWorker={onIdleWorker}
         onSelectMode={onSelectMode}
+        isMobile={isMobile}
+        minimapOpen={minimapOpen}
+        onToggleMinimap={() => setMinimapOpen((v) => !v)}
       />
     </div>
   );
