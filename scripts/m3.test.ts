@@ -422,5 +422,39 @@ function findOpenBlock(world: ReturnType<typeof createWorld>, size: number): { x
   check("snapshot carries every player's alive state", view.players.length === world.players.length);
 }
 
+// ---- 12. worker auto-advances to the next same-kind node when one runs out --
+{
+  const world = createWorld(7, [PS[0]]);
+  const fog = createFog(world);
+  const worker = world.units.find((u) => u.owner === 0 && u.type === "worker")!;
+  // nearest wood node to the worker
+  let node = world.resourceNodes.find((n) => n.kind === "wood")!;
+  let best = Infinity;
+  for (const n of world.resourceNodes) {
+    if (n.kind !== "wood") continue;
+    const d = Math.hypot(n.tile.x - worker.pos.x, n.tile.y - worker.pos.y);
+    if (d < best) { best = d; node = n; }
+  }
+  const woodCount = world.resourceNodes.filter((n) => n.kind === "wood").length;
+  if (woodCount < 2) {
+    console.log("AUTO-ADVANCE: SKIP (need 2+ wood nodes on seed)");
+  } else {
+    node.amount = 8; // less than a full carry load -> depletes in one trip
+    const firstId = node.id;
+    applyCommand(world, 0, { c: "gather", units: [worker.id], node: node.id });
+    for (let i = 0; i < 200; i++) tick(world, fog);
+    check("the emptied node is removed", !world.resourceNodes.some((n) => n.id === firstId));
+    const tgt =
+      worker.targetEntity !== null
+        ? world.resourceNodes.find((n) => n.id === worker.targetEntity)
+        : null;
+    check(
+      "worker auto-advances to another wood node (not idle)",
+      worker.state !== "idle" && !!tgt && tgt.kind === "wood" && tgt.id !== firstId,
+      `state=${worker.state} target=${worker.targetEntity}`,
+    );
+  }
+}
+
 console.log(pass ? "M3: PASS ✅" : "M3: FAIL ❌");
 process.exit(pass ? 0 : 1);

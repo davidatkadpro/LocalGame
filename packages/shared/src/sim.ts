@@ -35,6 +35,8 @@ import type {
   EntityId,
   PlayerId,
   QueuedOrder,
+  ResourceKind,
+  ResourceNode,
   Unit,
   UnitType,
   Vec2,
@@ -689,6 +691,33 @@ function gatherableNodeAt(world: World, x: number, y: number, owner: PlayerId) {
   );
 }
 
+// How far a worker will roam on its own to find the next node of the same kind
+// after exhausting one, before giving up and going idle.
+const AUTO_GATHER_SEEK = 18;
+
+/** Nearest non-empty node of `kind` a worker may harvest (neutral, or its own
+ *  farm), within `maxDist`. Drives auto-advance to the next tree/gold/bush. */
+function nearestGatherNode(
+  world: World,
+  owner: PlayerId,
+  pos: Vec2,
+  kind: ResourceKind,
+  maxDist: number,
+): ResourceNode | null {
+  let best: ResourceNode | null = null;
+  let bestD = maxDist;
+  for (const n of world.resourceNodes) {
+    if (n.kind !== kind || n.amount <= 0) continue;
+    if (n.owner !== undefined && n.owner !== owner) continue; // enemy farm
+    const d = distToTile(pos, n.tile);
+    if (d < bestD) {
+      bestD = d;
+      best = n;
+    }
+  }
+  return best;
+}
+
 function spawnFromBuilding(world: World, b: Building, type: UnitType) {
   const d = BUILDING_DEFS[b.type].size;
   // spawn just outside the footprint, on a walkable tile if possible
@@ -1100,15 +1129,27 @@ function tryDeposit(world: World, u: Unit): void {
     // which otherwise surfaces as 360.000000000001 / 494.99999999999625 in the HUD.
     res[u.carry.kind] = Math.round((res[u.carry.kind] + u.carry.amount) * 1000) / 1000;
     world.stats[u.owner].resourcesGathered += u.carry.amount;
+    const kind = u.carry.kind;
     u.carry = null;
-    // go back to the node if it still exists
     const node = u.targetEntity !== null ? nodeById(world, u.targetEntity) : null;
-    if (node && node.amount > 0) {
+    // Resume the same node if it still has anything left. Owned farm nodes
+    // persist even at 0 (they regrow), so stick with them too.
+    if (node && (node.amount > 0 || node.owner !== undefined)) {
       u.state = "moving";
       u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world));
     } else {
-      u.state = "idle";
-      u.targetEntity = null;
+      // Node exhausted/gone: auto-advance to the nearest same-kind node within
+      // reach and keep gathering, instead of standing idle by an empty patch.
+      const next = nearestGatherNode(world, u.owner, u.pos, kind, AUTO_GATHER_SEEK);
+      if (next) {
+        u.targetEntity = next.id;
+        u.lastGatherNode = next.id;
+        u.state = "moving";
+        u.path = findPath(world.map, u.pos, tileCenterOf(next.tile), buildingBlocker(world));
+      } else {
+        u.state = "idle";
+        u.targetEntity = null;
+      }
     }
   } else if (drop) {
     u.state = "returning";
