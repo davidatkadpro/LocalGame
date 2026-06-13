@@ -445,6 +445,36 @@ button.cancel {
   line-height: 1;
 }
 
+/* Rich selection panel: one row per unit type, click to sub-select. */
+.sel-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sel-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  text-align: left;
+}
+.sel-group .sel-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+.sel-group .sel-count {
+  font-weight: 700;
+  min-width: 18px;
+}
+.sel-group .sel-name {
+  flex: 1;
+}
+.sel-group .sel-hp {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .upgrades {
   display: flex;
   gap: 6px;

@@ -28,6 +28,7 @@ export function Game() {
   const onAttackMove = () => gameRef.current?.armAttackMove();
   const onIdleWorker = () => gameRef.current?.selectNextIdleWorker();
   const onSelectMode = () => gameRef.current?.armSelectMode();
+  const onSelectIds = (ids: number[]) => gameRef.current?.setSelectionIds(ids);
   const getViewport = () => gameRef.current?.getViewport();
 
   return (
@@ -40,6 +41,7 @@ export function Game() {
         onAttackMove={onAttackMove}
         onIdleWorker={onIdleWorker}
         onSelectMode={onSelectMode}
+        onSelectIds={onSelectIds}
         isMobile={isMobile}
         minimapOpen={minimapOpen}
         onToggleMinimap={() => setMinimapOpen((v) => !v)}

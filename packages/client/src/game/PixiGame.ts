@@ -186,6 +186,17 @@ export class PixiGame {
     return [...this.selected];
   }
 
+  /** Replace the unit selection with a specific id set (HUD sub-select). */
+  setSelectionIds(ids: number[]): void {
+    const snap = useStore.getState().curr;
+    const live = snap ? ids.filter((id) => snap.units.some((u) => u.id === id)) : ids;
+    if (live.length === 0) return;
+    this.selected = new Set(live);
+    this.selectedBuilding = null;
+    this.commitSelection();
+    sfx.select();
+  }
+
   /** Arm attack-move: the next map click issues an attack-move for the selection. */
   armAttackMove(): void {
     if (this.selected.size === 0) return;

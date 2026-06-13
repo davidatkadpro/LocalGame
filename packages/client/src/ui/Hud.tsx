@@ -16,6 +16,7 @@ interface HudProps {
   onAttackMove: () => void;
   onIdleWorker: () => void;
   onSelectMode: () => void;
+  onSelectIds: (ids: number[]) => void;
   isMobile: boolean;
   minimapOpen: boolean;
   onToggleMinimap: () => void;
@@ -26,6 +27,12 @@ const UNIT_LABEL: Record<UnitType, string> = {
   soldier: "Soldier",
   archer: "Archer",
   ram: "Ram",
+};
+const UNIT_ICON: Record<UnitType, string> = {
+  worker: "👷",
+  soldier: "🛡",
+  archer: "🏹",
+  ram: "🐏",
 };
 export const BUILDING_LABEL: Record<BuildingType, string> = {
   town_center: "Town Center",
@@ -47,6 +54,7 @@ export function Hud({
   onAttackMove,
   onIdleWorker,
   onSelectMode,
+  onSelectIds,
   isMobile,
   minimapOpen,
   onToggleMinimap,
@@ -126,6 +134,7 @@ export function Hud({
           minimapOpen={minimapOpen}
           onToggleMinimap={onToggleMinimap}
           onConcede={() => setConfirmConcede(true)}
+          onSelectIds={onSelectIds}
         />
       ) : (
         <div className="hud-bottom">
@@ -143,7 +152,7 @@ export function Hud({
             building={building}
             res={res}
             upgrades={upgrades}
-            selectedCount={selectedUnits.length}
+            onSelectIds={onSelectIds}
           />
           <ControlsPanelView showControls={showControls} setControls={setControls} />
         </div>
@@ -235,25 +244,67 @@ function SelectionPanelView({
   building,
   res,
   upgrades,
-  selectedCount,
+  onSelectIds,
 }: {
   building: BuildingDTO | null;
   res: Resources;
   upgrades: UpgradeId[];
-  selectedCount: number;
+  onSelectIds: (ids: number[]) => void;
 }) {
+  const selectedUnits = useStore((s) => s.selectedUnits);
+  const curr = useStore((s) => s.curr);
+
   if (building) {
     return <BuildingPanel building={building} resources={res} owned={upgrades} />;
   }
+
+  // Group the current unit selection by type for icons + counts + summed HP.
+  const byType = new Map<UnitType, { ids: number[]; hp: number; maxHp: number }>();
+  if (curr) {
+    for (const id of selectedUnits) {
+      const u = curr.units.find((x) => x.id === id);
+      if (!u) continue;
+      const g = byType.get(u.type) ?? { ids: [], hp: 0, maxHp: 0 };
+      g.ids.push(id);
+      g.hp += u.hp;
+      g.maxHp += UNIT_DEFS[u.type].hp;
+      byType.set(u.type, g);
+    }
+  }
+  const groups = [...byType.entries()];
+  const total = groups.reduce((n, [, g]) => n + g.ids.length, 0);
+
+  if (total === 0) {
+    return (
+      <div className="panel">
+        <div className="panel-title">Selection</div>
+        <div className="small muted">Nothing selected</div>
+        <div className="small muted">Select a building to train units or research upgrades.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="panel">
-      <div className="panel-title">Selection</div>
-      <div className="small muted">
-        {selectedCount > 0
-          ? `${selectedCount} unit${selectedCount > 1 ? "s" : ""} selected`
-          : "Nothing selected"}
+      <div className="panel-title">Selection ({total})</div>
+      <div className="sel-groups">
+        {groups.map(([type, g]) => (
+          <button
+            key={type}
+            className="sel-group"
+            onClick={() => onSelectIds(g.ids)}
+            title={`Select only ${UNIT_LABEL[type]}s (${g.ids.length})`}
+          >
+            <span className="sel-icon">{UNIT_ICON[type]}</span>
+            <span className="sel-count">{g.ids.length}</span>
+            <span className="sel-name">{UNIT_LABEL[type]}</span>
+            <span className="sel-hp">
+              {Math.round(g.hp)}/{g.maxHp}
+            </span>
+          </button>
+        ))}
       </div>
-      <div className="small muted">Select a building to train units or research upgrades.</div>
+      {groups.length > 1 && <div className="small muted">Tap a row to select only that type.</div>}
     </div>
   );
 }
@@ -328,6 +379,7 @@ function MobileBottom({
   minimapOpen,
   onToggleMinimap,
   onConcede,
+  onSelectIds,
 }: {
   onPlace: (b: BuildingType) => void;
   onAttackMove: () => void;
@@ -343,6 +395,7 @@ function MobileBottom({
   minimapOpen: boolean;
   onToggleMinimap: () => void;
   onConcede: () => void;
+  onSelectIds: (ids: number[]) => void;
 }) {
   const [tab, setTab] = useState<MobileTab | null>(null);
 
@@ -385,7 +438,7 @@ function MobileBottom({
               building={building}
               res={res}
               upgrades={upgrades}
-              selectedCount={selectedCount}
+              onSelectIds={onSelectIds}
             />
           )}
           {tab === "controls" && (
