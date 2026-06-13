@@ -91,7 +91,11 @@ export interface Snapshot {
     pop: number;
     popCap: number;
     upgrades: UpgradeId[];
+    /** false once this player has been eliminated (they spectate from then on) */
+    alive: boolean;
   };
+  /** live alive-state of every player (for spectate awareness + event feed) */
+  players: { id: PlayerId; alive: boolean }[];
   units: UnitDTO[];
   buildings: BuildingDTO[];
   resources: ResourceNodeDTO[];

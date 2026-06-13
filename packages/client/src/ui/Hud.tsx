@@ -78,6 +78,13 @@ export function Hud({
 
   const building = snap?.buildings.find((b) => b.id === selectedBuilding) ?? null;
 
+  // Eliminated players keep watching the match (full-map vision from the server)
+  // with the build/command HUD removed — only a spectate banner remains.
+  const spectating = snap ? snap.me.alive === false : false;
+  if (spectating) {
+    return <div className="spectate-banner">👁 You were eliminated — spectating</div>;
+  }
+
   return (
     <>
       <div className="hud-top">

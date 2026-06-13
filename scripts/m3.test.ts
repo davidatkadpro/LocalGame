@@ -10,6 +10,7 @@ import {
   isWalkable,
   placementValid,
   tick,
+  viewFor,
 } from "@bg/shared";
 
 const PS = [
@@ -362,6 +363,18 @@ function findOpenBlock(world: ReturnType<typeof createWorld>, size: number): { x
   for (let i = 0; i < 250; i++) tick(world, fog); // a full gather->deposit cycle
   check("stats: resourcesGathered accrues on deposit", world.stats[0].resourcesGathered > 0, `g=${world.stats[0].resourcesGathered}`);
   check("stats: peakPop tracks starting pop", world.stats[0].peakPop >= 3);
+}
+
+// ---- 11. eliminated players spectate with full vision ----------------------
+{
+  const world = createWorld(7, PS);
+  const fog = createFog(world);
+  applyCommand(world, 1, { c: "concede" });
+  tick(world, fog);
+  const view = viewFor(world, fog, 1);
+  check("spectator snapshot marks me eliminated", view.me.alive === false);
+  check("spectator sees the survivor's buildings (full reveal)", view.buildings.some((b) => b.owner === 0));
+  check("snapshot carries every player's alive state", view.players.length === world.players.length);
 }
 
 console.log(pass ? "M3: PASS ✅" : "M3: FAIL ❌");

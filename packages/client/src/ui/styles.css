@@ -389,6 +389,22 @@ button.cancel {
   background: #b8860b;
 }
 
+/* Spectator banner shown after a player is eliminated but the match continues. */
+.spectate-banner {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 24, 30, 0.9);
+  border: 1px solid #2c333d;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 14px;
+  color: var(--muted);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
 .icon-btn {
   padding: 4px 8px;
   font-size: 16px;

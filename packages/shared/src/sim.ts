@@ -1247,11 +1247,15 @@ function updateWinState(world: World): void {
 
 export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
   const me = world.players[player];
-  const visMask = fog.visible.get(player) ?? new Uint8Array(world.map.width * world.map.height);
-  const expMask = fog.explored.get(player) ?? new Uint8Array(world.map.width * world.map.height);
+  // Eliminated players spectate the whole match: reveal the full map and all
+  // entities rather than leaving them staring at fog with no vision sources.
+  const reveal = !me || !me.alive;
+  const full = reveal ? new Uint8Array(world.map.width * world.map.height).fill(1) : null;
+  const visMask = full ?? fog.visible.get(player) ?? new Uint8Array(world.map.width * world.map.height);
+  const expMask = full ?? fog.explored.get(player) ?? new Uint8Array(world.map.width * world.map.height);
 
   const units = world.units
-    .filter((u) => u.owner === player || isVisible(fog, player, Math.floor(u.pos.x), Math.floor(u.pos.y)))
+    .filter((u) => u.owner === player || reveal || isVisible(fog, player, Math.floor(u.pos.x), Math.floor(u.pos.y)))
     .map((u) => ({
       id: u.id,
       owner: u.owner,
@@ -1264,7 +1268,7 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
     }));
 
   const buildings = world.buildings
-    .filter((b) => b.owner === player || buildingFootprintVisible(fog, player, b))
+    .filter((b) => b.owner === player || reveal || buildingFootprintVisible(fog, player, b))
     .map((b) => {
       const dto: BuildingDTO = {
         id: b.id,
@@ -1291,7 +1295,7 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
     });
 
   const resources = world.resourceNodes
-    .filter((n) => isExplored(fog, player, n.tile.x, n.tile.y))
+    .filter((n) => reveal || isExplored(fog, player, n.tile.x, n.tile.y))
     .map((n) => ({
       id: n.id,
       kind: n.kind,
@@ -1311,7 +1315,9 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
       pop: me ? me.pop : 0,
       popCap: me ? me.popCap : 0,
       upgrades: me ? me.upgrades.slice() : [],
+      alive: me ? me.alive : false,
     },
+    players: world.players.map((p) => ({ id: p.id, alive: p.alive })),
     units,
     buildings,
     resources,
