@@ -51,6 +51,13 @@ export type UnitState =
   | "building"
   | "attacking";
 
+/** A queued order (shift-click). Executed in sequence once the unit goes idle. */
+export type QueuedOrder =
+  | { k: "move"; tile: Vec2 }
+  | { k: "gather"; node: EntityId }
+  | { k: "attack"; target: EntityId }
+  | { k: "attackMove"; tile: Vec2 };
+
 export interface Unit {
   id: EntityId;
   owner: PlayerId;
@@ -80,6 +87,8 @@ export interface Unit {
   retaliating: boolean;
   /** last resource node a worker gathered (to resume after building) */
   lastGatherNode: EntityId | null;
+  /** queued orders (shift-click), executed in order once the unit goes idle */
+  orders: QueuedOrder[];
 }
 
 export interface Building {

@@ -41,6 +41,8 @@ export interface UnitDTO {
   hp: number;
   state: UnitState;
   carry: ResourceKind | null;
+  /** queued-order waypoints (own units only) for drawing the command queue */
+  orders?: { x: number; y: number }[];
 }
 
 export interface BuildingDTO {
@@ -104,16 +106,16 @@ export interface Snapshot {
 // ---------- Commands (client intents) ----------
 
 export type Command =
-  | { c: "move"; units: number[]; tile: Vec2 }
-  | { c: "gather"; units: number[]; node: number }
+  | { c: "move"; units: number[]; tile: Vec2; queue?: boolean }
+  | { c: "gather"; units: number[]; node: number; queue?: boolean }
   | { c: "build"; unit: number; building: BuildingType; tile: Vec2 }
   | { c: "construct"; units: number[]; building: number }
   | { c: "train"; building: number; unit: UnitType }
   | { c: "cancelTrain"; building: number }
   | { c: "research"; building: number; upgrade: UpgradeId }
   | { c: "rally"; building: number; tile: Vec2 }
-  | { c: "attack"; units: number[]; target: number }
-  | { c: "attackMove"; units: number[]; tile: Vec2 }
+  | { c: "attack"; units: number[]; target: number; queue?: boolean }
+  | { c: "attackMove"; units: number[]; tile: Vec2; queue?: boolean }
   | { c: "stop"; units: number[] }
   | { c: "concede" };
 

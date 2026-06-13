@@ -562,14 +562,26 @@ export class PixiGame {
   private drawSelection(): void {
     const g = this.selectionLayer;
     g.clear();
+    const snap = useStore.getState().curr;
     const r = 0.52 + 0.03 * Math.sin(this.now / 200);
     for (const id of this.selected) {
       const sp = this.unitSprites.get(id);
       if (!sp) continue;
       g.circle(sp.x, sp.y, r).stroke({ width: 0.07, color: 0xffffff, alpha: 0.9 });
+      // queued-order path (shift-click): line + dot through each waypoint.
+      const u = snap?.units.find((x) => x.id === id);
+      if (u?.orders && u.orders.length > 0) {
+        let px = sp.x;
+        let py = sp.y;
+        for (const o of u.orders) {
+          g.moveTo(px, py).lineTo(o.x, o.y).stroke({ width: 0.04, color: 0x9ad1ff, alpha: 0.5 });
+          g.circle(o.x, o.y, 0.14).fill({ color: 0x9ad1ff, alpha: 0.7 });
+          px = o.x;
+          py = o.y;
+        }
+      }
     }
     if (this.selectedBuilding !== null) {
-      const snap = useStore.getState().curr;
       const b = snap?.buildings.find((x) => x.id === this.selectedBuilding);
       if (b) {
         const def = BUILDING_DEFS[b.type as BuildingType];
@@ -1254,12 +1266,14 @@ export class PixiGame {
       return;
     }
     const units = [...this.selected];
+    // Holding Shift queues the order after the current one (desktop).
+    const queue = keys.has("shift");
 
     // enemy unit?
     for (const u of snap.units) {
       if (u.owner !== this.me() && Math.hypot(u.x - wp.x, u.y - wp.y) < 0.6) {
         sfx.attack();
-        return this.send({ c: "attack", units, target: u.id });
+        return this.send({ c: "attack", units, target: u.id, queue });
       }
     }
     // enemy building?
@@ -1267,7 +1281,7 @@ export class PixiGame {
       const def = BUILDING_DEFS[b.type as BuildingType];
       if (b.owner !== this.me() && rectContains(b.tx, b.ty, def.size.w, def.size.h, tx, ty)) {
         sfx.attack();
-        return this.send({ c: "attack", units, target: b.id });
+        return this.send({ c: "attack", units, target: b.id, queue });
       }
     }
     // friendly building still under construction? -> send workers to finish it.
@@ -1299,19 +1313,19 @@ export class PixiGame {
       const workers = units.filter((id) => snap.units.find((u) => u.id === id)?.type === "worker");
       if (workers.length === 0) break; // no workers selected -> fall through to move
       sfx.command();
-      return this.send({ c: "gather", units: workers, node: node.id });
+      return this.send({ c: "gather", units: workers, node: node.id, queue });
     }
     // resource node? (skip enemy-owned farm nodes — the server would reject the
     // gather; fall through to a move so the order isn't silently dropped)
     for (const n of snap.resources) {
       if (n.tx === tx && n.ty === ty && (n.owner === undefined || n.owner === this.me())) {
         sfx.command();
-        return this.send({ c: "gather", units, node: n.id });
+        return this.send({ c: "gather", units, node: n.id, queue });
       }
     }
     // otherwise move
     sfx.command();
-    this.send({ c: "move", units, tile: { x: tx, y: ty } });
+    this.send({ c: "move", units, tile: { x: tx, y: ty }, queue });
   }
 
   /** Issue an attack-move for the current selection and disarm. */
@@ -1319,7 +1333,12 @@ export class PixiGame {
     this.armedAttack = false;
     if (this.selected.size === 0) return;
     sfx.attack();
-    this.send({ c: "attackMove", units: [...this.selected], tile: { x: Math.floor(wp.x), y: Math.floor(wp.y) } });
+    this.send({
+      c: "attackMove",
+      units: [...this.selected],
+      tile: { x: Math.floor(wp.x), y: Math.floor(wp.y) },
+      queue: keys.has("shift"),
+    });
   }
 
   private tryPlace(wp: { x: number; y: number }): void {

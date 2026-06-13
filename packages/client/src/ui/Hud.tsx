@@ -315,8 +315,9 @@ function ControlsText() {
       Drag-select / click your units. Right-click (or tap) to move, gather, or attack. Press{" "}
       <b>A</b> then click for attack-move; <b>.</b> cycles idle workers.
       <b> Ctrl+1–9</b> sets a control group, <b>1–9</b> recalls it (double-tap to centre). Select a
-      building, then right-click/tap to set its rally point. Pick <b>Wall</b> (with a worker
-      selected) and drag to build a line. Arrow keys / drag to pan, wheel / pinch to zoom.
+      building, then right-click/tap to set its rally point. <b>Shift+click</b> queues orders
+      (move/gather/attack). Pick <b>Wall</b> (with a worker selected) and drag to build a line.
+      Arrow keys / drag to pan, wheel / pinch to zoom.
       <br />
       <b>Touch:</b> tap <b>▣ Box select</b> then drag to marquee units; double-tap a unit to grab
       all of its type on screen; long-press to issue a command (e.g. send a worker to finish a

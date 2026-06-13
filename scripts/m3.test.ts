@@ -388,6 +388,28 @@ function findOpenBlock(world: ReturnType<typeof createWorld>, size: number): { x
   check("rallied-to-node worker auto-targets the node", fresh?.targetEntity === node.id);
 }
 
+// ---- 10c. shift-queued commands append and advance -------------------------
+{
+  const world = createWorld(7, PS);
+  const fog = createFog(world);
+  const w = world.units.find((u) => u.owner === 0 && u.type === "worker")!;
+  const A = { x: Math.floor(w.pos.x) + 1, y: Math.floor(w.pos.y) };
+  const B = { x: Math.floor(w.pos.x) + 2, y: Math.floor(w.pos.y) };
+  applyCommand(world, 0, { c: "move", units: [w.id], tile: A });
+  applyCommand(world, 0, { c: "move", units: [w.id], tile: B, queue: true });
+  check("queued order is appended, not replacing", w.orders.length === 1 && w.state === "moving");
+  applyCommand(world, 0, { c: "move", units: [w.id], tile: A }); // fresh order wipes the queue
+  check("an immediate command clears the queue", w.orders.length === 0);
+  applyCommand(world, 0, { c: "move", units: [w.id], tile: B, queue: true });
+  w.state = "idle";
+  w.path = []; // simulate finishing the active order
+  tick(world, fog);
+  check(
+    "an idle unit picks up its next queued order",
+    w.orders.length === 0 && w.targetTile?.x === B.x && w.targetTile?.y === B.y,
+  );
+}
+
 // ---- 11. eliminated players spectate with full vision ----------------------
 {
   const world = createWorld(7, PS);

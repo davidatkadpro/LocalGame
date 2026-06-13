@@ -27,12 +27,14 @@ import {
   type BuildingDTO,
   type Command,
   type Snapshot,
+  type UnitDTO,
 } from "./protocol";
 import type {
   Building,
   BuildingType,
   EntityId,
   PlayerId,
+  QueuedOrder,
   Unit,
   UnitType,
   Vec2,
@@ -136,6 +138,7 @@ function makeUnit(world: World, owner: PlayerId, type: UnitType, pos: Vec2): Uni
     attackedTtl: 0,
     retaliating: false,
     lastGatherNode: null,
+    orders: [],
   };
 }
 
@@ -231,6 +234,11 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
         if (!u || u.owner !== playerId) continue;
         movers.push(u);
       }
+      if (cmd.queue) {
+        for (const u of movers) u.orders.push({ k: "move", tile: { ...cmd.tile } });
+        break;
+      }
+      for (const u of movers) u.orders = [];
       if (movers.length === 1) {
         orderMove(world, movers[0], cmd.tile);
       } else if (movers.length > 1) {
@@ -252,6 +260,7 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
         u.aggro = null;
         u.attackedBy = null;
         u.retaliating = false;
+        u.orders = [];
       }
       break;
     }
@@ -262,6 +271,11 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
       for (const id of cmd.units) {
         const u = unitById(world, id);
         if (!u || u.owner !== playerId || u.type !== "worker") continue;
+        if (cmd.queue) {
+          u.orders.push({ k: "gather", node: node.id });
+          continue;
+        }
+        u.orders = [];
         u.targetEntity = node.id;
         u.lastGatherNode = node.id;
         u.state = "moving";
@@ -362,6 +376,11 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
       for (const id of cmd.units) {
         const u = unitById(world, id);
         if (!u || u.owner !== playerId) continue;
+        if (cmd.queue) {
+          u.orders.push({ k: "attack", target: cmd.target });
+          continue;
+        }
+        u.orders = [];
         u.targetEntity = cmd.target;
         u.state = "attacking";
         u.targetTile = null;
@@ -377,6 +396,11 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
       for (const id of cmd.units) {
         const u = unitById(world, id);
         if (!u || u.owner !== playerId) continue;
+        if (cmd.queue) {
+          u.orders.push({ k: "attackMove", tile: { ...cmd.tile } });
+          continue;
+        }
+        u.orders = [];
         u.state = "moving";
         u.targetEntity = null;
         u.targetTile = { ...cmd.tile };
@@ -403,6 +427,53 @@ function orderMove(world: World, u: Unit, tile: Vec2) {
   u.retaliating = false;
   u.repaths = 0;
   u.path = findPath(world.map, u.pos, tileCenterOf(tile), buildingBlocker(world));
+}
+
+/** Begin a single queued order on a unit (does not touch its remaining queue).
+ *  Invalid orders (dead node/wrong type) are skipped by going idle so the next
+ *  order is picked up on the following tick. */
+function startOrder(world: World, u: Unit, order: QueuedOrder): void {
+  switch (order.k) {
+    case "move":
+      orderMove(world, u, order.tile);
+      break;
+    case "gather": {
+      const node = nodeById(world, order.node);
+      if (!node || u.type !== "worker" || (node.owner !== undefined && node.owner !== u.owner)) {
+        u.state = "idle";
+        return;
+      }
+      u.targetEntity = node.id;
+      u.lastGatherNode = node.id;
+      u.targetTile = null;
+      u.aggro = null;
+      u.attackedBy = null;
+      u.retaliating = false;
+      u.state = "moving";
+      u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world));
+      break;
+    }
+    case "attack":
+      u.targetEntity = order.target;
+      u.state = "attacking";
+      u.targetTile = null;
+      u.aggro = null;
+      u.attackedBy = null;
+      u.retaliating = false;
+      u.path = [];
+      break;
+    case "attackMove": {
+      const goal = tileCenterOf(order.tile);
+      u.state = "moving";
+      u.targetEntity = null;
+      u.targetTile = { ...order.tile };
+      u.aggro = { ...goal };
+      u.attackedBy = null;
+      u.retaliating = false;
+      u.path = findPath(world.map, u.pos, goal, buildingBlocker(world));
+      break;
+    }
+  }
 }
 
 /**
@@ -721,6 +792,11 @@ function updateUnit(world: World, u: Unit): void {
 
   switch (u.state) {
     case "idle":
+      // Pick up the next queued order (shift-click) before considering defence.
+      if (u.orders.length > 0) {
+        startOrder(world, u, u.orders.shift()!);
+        return;
+      }
       tryRetaliate(world, u);
       return;
     case "moving": {
@@ -1266,6 +1342,29 @@ function updateWinState(world: World): void {
 
 // ---------------------------------------------------------------- snapshot view
 
+/** World position a queued order points at, for drawing the command-queue path. */
+function orderPoint(world: World, o: QueuedOrder): { x: number; y: number } | null {
+  switch (o.k) {
+    case "move":
+    case "attackMove":
+      return { x: o.tile.x + 0.5, y: o.tile.y + 0.5 };
+    case "gather": {
+      const n = nodeById(world, o.node);
+      return n ? { x: n.tile.x + 0.5, y: n.tile.y + 0.5 } : null;
+    }
+    case "attack": {
+      const t = unitById(world, o.target);
+      if (t) return { x: t.pos.x, y: t.pos.y };
+      const b = buildingById(world, o.target);
+      if (b) {
+        const d = BUILDING_DEFS[b.type].size;
+        return { x: b.tile.x + d.w / 2, y: b.tile.y + d.h / 2 };
+      }
+      return null;
+    }
+  }
+}
+
 export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
   const me = world.players[player];
   // Eliminated players spectate the whole match: reveal the full map and all
@@ -1277,16 +1376,26 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
 
   const units = world.units
     .filter((u) => u.owner === player || reveal || isVisible(fog, player, Math.floor(u.pos.x), Math.floor(u.pos.y)))
-    .map((u) => ({
-      id: u.id,
-      owner: u.owner,
-      type: u.type,
-      x: u.pos.x,
-      y: u.pos.y,
-      hp: u.hp,
-      state: u.state,
-      carry: u.carry ? u.carry.kind : null,
-    }));
+    .map((u) => {
+      const dto: UnitDTO = {
+        id: u.id,
+        owner: u.owner,
+        type: u.type,
+        x: u.pos.x,
+        y: u.pos.y,
+        hp: u.hp,
+        state: u.state,
+        carry: u.carry ? u.carry.kind : null,
+      };
+      // Own units carry their queued-order waypoints for the command-queue overlay.
+      if (u.owner === player && u.orders.length > 0) {
+        const pts = u.orders
+          .map((o) => orderPoint(world, o))
+          .filter((p): p is { x: number; y: number } => p !== null);
+        if (pts.length > 0) dto.orders = pts;
+      }
+      return dto;
+    });
 
   const buildings = world.buildings
     .filter((b) => b.owner === player || reveal || buildingFootprintVisible(fog, player, b))
