@@ -1,0 +1,23 @@
+{
+  "name": "buildergame",
+  "private": true,
+  "version": "0.1.0",
+  "description": "LAN-hosted simplified Age-of-Empires-style RTS in the browser",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm -w @bg/server run dev",
+    "dev:client": "npm -w @bg/client run dev",
+    "build": "npm -w @bg/client run build",
+    "start": "npm -w @bg/server run start",
+    "typecheck": "npm -ws --if-present run typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.6.3",
+    "@types/node": "^22.7.4"
+  }
+}
