@@ -119,6 +119,8 @@ export interface Player {
   id: PlayerId;
   name: string;
   color: string; // hex
+  /** team id; players sharing a team are allies (FFA = each player own team) */
+  team: number;
   resources: Resources;
   pop: number;
   popCap: number;

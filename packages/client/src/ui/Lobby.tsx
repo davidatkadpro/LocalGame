@@ -9,6 +9,8 @@ export function Lobby() {
   const join = useStore((s) => s.join);
   const setColor = useStore((s) => s.setColor);
   const setReady = useStore((s) => s.setReady);
+  const setMode = useStore((s) => s.setMode);
+  const setTeam = useStore((s) => s.setTeam);
   const startGame = useStore((s) => s.startGame);
 
   const [name, setName] = useState("");
@@ -41,11 +43,36 @@ export function Lobby() {
 
   const mine = lobby?.slots.find((s) => s.playerId === myId);
   const iAmHost = mine?.isHost ?? false;
+  const mode = lobby?.mode ?? "ffa";
+  const teamLabel = (t: number) => (t === 0 ? "A" : "B");
 
   return (
     <div className="screen center">
       <div className="card wide">
         <h1>Lobby</h1>
+
+        <div className="row mode-row">
+          <span className="muted">Mode:</span>
+          <button
+            className={mode === "ffa" ? "armed" : ""}
+            disabled={!iAmHost}
+            onClick={() => setMode("ffa")}
+          >
+            Free-for-all
+          </button>
+          <button
+            className={mode === "2v2" ? "armed" : ""}
+            disabled={!iAmHost}
+            onClick={() => setMode("2v2")}
+            title="Requires 4 players, 2 per team"
+          >
+            2v2
+          </button>
+          {mode === "2v2" && !iAmHost && (
+            <span className="muted small">The host assigns teams.</span>
+          )}
+        </div>
+
         <div className="slots">
           {Array.from({ length: MAX_PLAYERS }).map((_, i) => {
             const slot = lobby?.slots.find((s) => s.playerId === i);
@@ -59,6 +86,22 @@ export function Lobby() {
                       {slot.isHost ? " 👑" : ""}
                       {slot.playerId === myId ? " (you)" : ""}
                     </span>
+                    {mode === "2v2" &&
+                      (iAmHost ? (
+                        <span className="team-pick">
+                          {[0, 1].map((t) => (
+                            <button
+                              key={t}
+                              className={`team-btn ${slot.team === t ? "active" : ""}`}
+                              onClick={() => setTeam(slot.playerId, t)}
+                            >
+                              {teamLabel(t)}
+                            </button>
+                          ))}
+                        </span>
+                      ) : (
+                        <span className="tag">Team {teamLabel(slot.team)}</span>
+                      ))}
                     <span className={`tag ${slot.ready ? "ready" : ""}`}>
                       {slot.ready ? "Ready" : "Not ready"}
                     </span>
@@ -99,7 +142,11 @@ export function Lobby() {
           )}
         </div>
         {!lobby?.canStart && (
-          <p className="muted small">Need 2–4 players, all ready, to start.</p>
+          <p className="muted small">
+            {mode === "2v2"
+              ? "Need 4 players, all ready, split 2 per team, to start."
+              : "Need 2–4 players, all ready, to start."}
+          </p>
         )}
       </div>
     </div>

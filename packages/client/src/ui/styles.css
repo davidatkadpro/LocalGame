@@ -203,6 +203,26 @@ button.primary:hover:not(:disabled) {
   color: #51cf66;
 }
 
+.mode-row {
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+.team-pick {
+  display: inline-flex;
+  gap: 4px;
+}
+.team-btn {
+  width: 28px;
+  padding: 4px 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.team-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .swatch {
   width: 28px;
   height: 28px;

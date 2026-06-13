@@ -1096,6 +1096,16 @@ export class PixiGame {
     return useStore.getState().myPlayerId ?? 0;
   }
 
+  /** Is `owner` an enemy (different team)? Allies and self are not. */
+  private isEnemy(owner: number): boolean {
+    if (owner === this.me()) return false;
+    const players = useStore.getState().players;
+    const myTeam = players.find((p) => p.id === this.me())?.team;
+    const theirTeam = players.find((p) => p.id === owner)?.team;
+    if (myTeam === undefined || theirTeam === undefined) return true; // FFA fallback
+    return myTeam !== theirTeam;
+  }
+
   /** Nearest own unit to a world point, within a small radius, or null. */
   private ownUnitAt(wp: { x: number; y: number }): number | null {
     const snap = useStore.getState().curr;
@@ -1269,9 +1279,9 @@ export class PixiGame {
     // Holding Shift queues the order after the current one (desktop).
     const queue = keys.has("shift");
 
-    // enemy unit?
+    // enemy unit? (allies in 2v2 are not valid targets)
     for (const u of snap.units) {
-      if (u.owner !== this.me() && Math.hypot(u.x - wp.x, u.y - wp.y) < 0.6) {
+      if (this.isEnemy(u.owner) && Math.hypot(u.x - wp.x, u.y - wp.y) < 0.6) {
         sfx.attack();
         return this.send({ c: "attack", units, target: u.id, queue });
       }
@@ -1279,7 +1289,7 @@ export class PixiGame {
     // enemy building?
     for (const b of snap.buildings) {
       const def = BUILDING_DEFS[b.type as BuildingType];
-      if (b.owner !== this.me() && rectContains(b.tx, b.ty, def.size.w, def.size.h, tx, ty)) {
+      if (this.isEnemy(b.owner) && rectContains(b.tx, b.ty, def.size.w, def.size.h, tx, ty)) {
         sfx.attack();
         return this.send({ c: "attack", units, target: b.id, queue });
       }

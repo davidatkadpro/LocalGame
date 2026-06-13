@@ -57,6 +57,8 @@ interface GameState {
   join: (name: string) => void;
   setColor: (color: string) => void;
   setReady: (ready: boolean) => void;
+  setMode: (mode: "ffa" | "2v2") => void;
+  setTeam: (target: number, team: number) => void;
   startGame: () => void;
   command: (cmd: Command) => void;
 }
@@ -184,6 +186,8 @@ export const useStore = create<GameState>((set, get) => ({
   },
   setColor: (color) => get().conn?.send({ t: "setColor", color }),
   setReady: (ready) => get().conn?.send({ t: "setReady", ready }),
+  setMode: (mode) => get().conn?.send({ t: "setMode", mode }),
+  setTeam: (target, team) => get().conn?.send({ t: "setTeam", target, team }),
   startGame: () => get().conn?.send({ t: "startGame" }),
   command: (cmd) => get().conn?.send({ t: "command", cmd }),
 }));

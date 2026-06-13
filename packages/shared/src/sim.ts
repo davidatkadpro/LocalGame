@@ -18,7 +18,7 @@ import {
   payCost,
   unitDamage,
 } from "./constants";
-import { Fog, isExplored, isVisible, updateVision } from "./fog";
+import { Fog, updateVision } from "./fog";
 import { dist, inBounds, rectContains, tileIndex } from "./geometry";
 import { generateMap } from "./map";
 import { findPath, isWalkable } from "./pathfinding";
@@ -44,6 +44,16 @@ import type {
 export interface PlayerSeed {
   name: string;
   color: string;
+  /** team id; omit/duplicate-per-player for FFA */
+  team?: number;
+}
+
+/** Two players are allies if they share a team. */
+export function sameTeam(world: World, a: PlayerId, b: PlayerId): boolean {
+  if (a === b) return true;
+  const pa = world.players[a];
+  const pb = world.players[b];
+  return !!pa && !!pb && pa.team === pb.team;
 }
 
 const ARRIVE_EPS = 0.06;
@@ -81,6 +91,7 @@ export function createWorld(seed: number, playerSeeds: PlayerSeed[]): World {
       id: i,
       name: ps.name,
       color: ps.color,
+      team: ps.team ?? i, // FFA default: each player is their own team
       resources: { ...STARTING_RESOURCES },
       pop: 0,
       popCap: BASE_POP_CAP,
@@ -555,7 +566,7 @@ function acquireTarget(world: World, u: Unit): EntityId | null {
   let best: EntityId | null = null;
   let bestD = sight;
   for (const e of world.units) {
-    if (e.owner === u.owner || e.hp <= 0) continue;
+    if (sameTeam(world, e.owner, u.owner) || e.hp <= 0) continue;
     const d = dist(u.pos, e.pos);
     if (d < bestD) {
       bestD = d;
@@ -566,7 +577,7 @@ function acquireTarget(world: World, u: Unit): EntityId | null {
   // no enemy units in range — look for an enemy building
   bestD = sight;
   for (const b of world.buildings) {
-    if (b.owner === u.owner) continue;
+    if (sameTeam(world, b.owner, u.owner)) continue;
     const d = distToBuilding(u.pos, b);
     if (d < bestD) {
       bestD = d;
@@ -714,7 +725,7 @@ function tickTowers(world: World): void {
     let target: Unit | null = null;
     let bestD = def.attack.range;
     for (const u of world.units) {
-      if (u.owner === b.owner || u.hp <= 0) continue;
+      if (sameTeam(world, u.owner, b.owner) || u.hp <= 0) continue;
       const d = distToBuilding(u.pos, b);
       if (d <= bestD) {
         bestD = d;
@@ -1206,6 +1217,14 @@ function doAttack(world: World, u: Unit): void {
     u.state = "idle";
     return;
   }
+  // No friendly fire: never damage an ally even if explicitly ordered to.
+  const targetOwner = targetUnit ? targetUnit.owner : targetBuilding!.owner;
+  if (sameTeam(world, targetOwner, u.owner)) {
+    u.targetEntity = null;
+    if (resumeAggro(world, u)) return;
+    u.state = "idle";
+    return;
+  }
 
   const targetPos = targetUnit ? targetUnit.pos : buildingCenter(targetBuilding!);
   const range = targetUnit
@@ -1283,7 +1302,7 @@ function isRetaliation(u: Unit): boolean {
 function tryRetaliate(world: World, u: Unit): void {
   if (u.attackedBy === null) return;
   const foe = unitById(world, u.attackedBy);
-  if (!foe || foe.hp <= 0 || foe.owner === u.owner) {
+  if (!foe || foe.hp <= 0 || sameTeam(world, foe.owner, u.owner)) {
     u.attackedBy = null;
     return;
   }
@@ -1334,9 +1353,12 @@ function updateWinState(world: World): void {
       p.alive = false;
     }
   }
+  // Game ends when every surviving player belongs to a single team (last team
+  // standing). winner is a representative of that team (FFA: the sole survivor).
   const alive = world.players.filter((p) => p.alive);
-  if (world.players.length >= 2 && alive.length <= 1) {
-    world.winner = alive.length === 1 ? alive[0].id : null;
+  const teams = new Set(alive.map((p) => p.team));
+  if (world.players.length >= 2 && teams.size <= 1) {
+    world.winner = alive.length > 0 ? alive[0].id : null;
   }
 }
 
@@ -1365,17 +1387,55 @@ function orderPoint(world: World, o: QueuedOrder): { x: number; y: number } | nu
   }
 }
 
+/** OR several players' fog masks into one (team-shared vision). Returns a single
+ *  player's mask directly when there's only one teammate, to avoid a copy. */
+function orMasks(
+  masks: Map<PlayerId, Uint8Array>,
+  ids: PlayerId[],
+  size: number,
+  solo?: Uint8Array,
+): Uint8Array {
+  if (ids.length <= 1) return solo ?? masks.get(ids[0]) ?? new Uint8Array(size);
+  const out = new Uint8Array(size);
+  for (const id of ids) {
+    const m = masks.get(id);
+    if (!m) continue;
+    for (let i = 0; i < size; i++) if (m[i]) out[i] = 1;
+  }
+  return out;
+}
+
 export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
   const me = world.players[player];
+  const w = world.map.width;
+  const h = world.map.height;
+  const size = w * h;
   // Eliminated players spectate the whole match: reveal the full map and all
   // entities rather than leaving them staring at fog with no vision sources.
   const reveal = !me || !me.alive;
-  const full = reveal ? new Uint8Array(world.map.width * world.map.height).fill(1) : null;
-  const visMask = full ?? fog.visible.get(player) ?? new Uint8Array(world.map.width * world.map.height);
-  const expMask = full ?? fog.explored.get(player) ?? new Uint8Array(world.map.width * world.map.height);
+  const myTeam = me ? me.team : -1;
+  // Team-shared vision: OR the masks of every teammate (FFA = just this player).
+  const mates = me ? world.players.filter((p) => p.team === me.team).map((p) => p.id) : [player];
+  const visMask = reveal
+    ? new Uint8Array(size).fill(1)
+    : orMasks(fog.visible, mates, size, fog.visible.get(player));
+  const expMask = reveal
+    ? new Uint8Array(size).fill(1)
+    : orMasks(fog.explored, mates, size, fog.explored.get(player));
+  const seesTile = (x: number, y: number) =>
+    x >= 0 && y >= 0 && x < w && y < h && visMask[y * w + x] === 1;
+  const expTile = (x: number, y: number) =>
+    x >= 0 && y >= 0 && x < w && y < h && expMask[y * w + x] === 1;
+  const footprintSeen = (b: Building) => {
+    const d = BUILDING_DEFS[b.type].size;
+    for (let y = b.tile.y; y < b.tile.y + d.h; y++)
+      for (let x = b.tile.x; x < b.tile.x + d.w; x++) if (seesTile(x, y)) return true;
+    return false;
+  };
+  const isAlly = (owner: PlayerId) => world.players[owner]?.team === myTeam;
 
   const units = world.units
-    .filter((u) => u.owner === player || reveal || isVisible(fog, player, Math.floor(u.pos.x), Math.floor(u.pos.y)))
+    .filter((u) => isAlly(u.owner) || reveal || seesTile(Math.floor(u.pos.x), Math.floor(u.pos.y)))
     .map((u) => {
       const dto: UnitDTO = {
         id: u.id,
@@ -1398,7 +1458,7 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
     });
 
   const buildings = world.buildings
-    .filter((b) => b.owner === player || reveal || buildingFootprintVisible(fog, player, b))
+    .filter((b) => isAlly(b.owner) || reveal || footprintSeen(b))
     .map((b) => {
       const dto: BuildingDTO = {
         id: b.id,
@@ -1425,7 +1485,7 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
     });
 
   const resources = world.resourceNodes
-    .filter((n) => reveal || isExplored(fog, player, n.tile.x, n.tile.y))
+    .filter((n) => reveal || expTile(n.tile.x, n.tile.y))
     .map((n) => ({
       id: n.id,
       kind: n.kind,
@@ -1452,15 +1512,5 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
     buildings,
     resources,
   };
-}
-
-function buildingFootprintVisible(fog: Fog, player: PlayerId, b: Building): boolean {
-  const d = BUILDING_DEFS[b.type].size;
-  for (let y = b.tile.y; y < b.tile.y + d.h; y++) {
-    for (let x = b.tile.x; x < b.tile.x + d.w; x++) {
-      if (isVisible(fog, player, x, y)) return true;
-    }
-  }
-  return false;
 }
 

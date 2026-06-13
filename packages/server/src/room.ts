@@ -13,6 +13,7 @@ import {
   viewFor,
   type ClientMessage,
   type Fog,
+  type GameMode,
   type LobbySlot,
   type PlayerPublic,
   type ServerMessage,
@@ -34,12 +35,14 @@ interface Slot {
   color: string;
   ready: boolean;
   connected: boolean;
+  team: number;
 }
 
 type Phase = "lobby" | "playing" | "over";
 
 export class GameRoom {
   private slots = new Map<number, Slot>(); // playerId -> slot
+  private mode: GameMode = "ffa";
   private phase: Phase = "lobby";
   private world: World | null = null;
   private fog: Fog | null = null;
@@ -90,6 +93,7 @@ export class GameRoom {
     this.fog = null;
     this.slots.clear();
     this.hostPlayerId = null;
+    this.mode = "ffa";
     this.phase = "lobby";
   }
 
@@ -110,6 +114,24 @@ export class GameRoom {
           slot.ready = msg.ready;
           this.broadcastLobby();
         });
+        break;
+      case "setMode":
+        // Host only. Switching to 2v2 seeds default teams; FFA gives each its own.
+        if (conn.playerId === this.hostPlayerId && this.phase === "lobby") {
+          this.mode = msg.mode;
+          this.assignDefaultTeams();
+          this.broadcastLobby();
+        }
+        break;
+      case "setTeam":
+        // Host only: assign a player to team 0 or 1 (2v2).
+        if (conn.playerId === this.hostPlayerId && this.phase === "lobby") {
+          const slot = this.slots.get(msg.target);
+          if (slot && (msg.team === 0 || msg.team === 1)) {
+            slot.team = msg.team;
+            this.broadcastLobby();
+          }
+        }
         break;
       case "startGame":
         if (conn.playerId === this.hostPlayerId) this.startGame();
@@ -165,6 +187,7 @@ export class GameRoom {
       color,
       ready: false,
       connected: true,
+      team: id, // FFA default: own team; host reassigns in 2v2
     });
     if (this.hostPlayerId === null) this.hostPlayerId = id;
     conn.send({ t: "welcome", playerId: id });
@@ -177,7 +200,7 @@ export class GameRoom {
     if (slot) fn(slot);
   }
 
-  private lobbyState(): { slots: LobbySlot[]; canStart: boolean } {
+  private lobbyState(): { slots: LobbySlot[]; canStart: boolean; mode: GameMode } {
     const slots: LobbySlot[] = [...this.slots.entries()]
       .sort((a, b) => a[0] - b[0])
       .map(([playerId, s]) => ({
@@ -187,10 +210,28 @@ export class GameRoom {
         ready: s.ready,
         connected: s.connected,
         isHost: playerId === this.hostPlayerId,
+        team: s.team,
       }));
     const ready = slots.filter((s) => s.ready).length;
-    const canStart = slots.length >= MIN_PLAYERS && ready === slots.length;
-    return { slots, canStart };
+    const allReady = slots.length >= MIN_PLAYERS && ready === slots.length;
+    let canStart = allReady;
+    if (this.mode === "2v2") {
+      // Need exactly 4 players, all ready, split 2-and-2 across teams 0 and 1.
+      const t0 = slots.filter((s) => s.team === 0).length;
+      const t1 = slots.filter((s) => s.team === 1).length;
+      canStart = allReady && slots.length === 4 && t0 === 2 && t1 === 2;
+    }
+    return { slots, canStart, mode: this.mode };
+  }
+
+  /** Seed teams when the mode changes: 2v2 splits current slots 2-and-2; FFA
+   *  gives each player their own team. */
+  private assignDefaultTeams(): void {
+    const ids = [...this.slots.keys()].sort((a, b) => a - b);
+    ids.forEach((id, i) => {
+      const slot = this.slots.get(id)!;
+      slot.team = this.mode === "2v2" ? (i < 2 ? 0 : 1) : id;
+    });
   }
 
   private broadcastLobby(): void {
@@ -206,8 +247,13 @@ export class GameRoom {
     this.phase = "playing";
 
     const ordered = [...this.slots.entries()].sort((a, b) => a[0] - b[0]);
-    // Re-pack player ids to 0..n-1 so the sim has contiguous slots.
-    const seeds = ordered.map(([, s]) => ({ name: s.name, color: s.color }));
+    // Re-pack player ids to 0..n-1 so the sim has contiguous slots. In FFA each
+    // packed player is its own team; in 2v2 we carry the host-assigned team.
+    const seeds = ordered.map(([, s], i) => ({
+      name: s.name,
+      color: s.color,
+      team: this.mode === "2v2" ? s.team : i,
+    }));
     const seed = (Math.floor(performance.now()) ^ (ordered.length * 2654435761)) >>> 0;
     this.world = createWorld(seed, seeds);
     this.fog = createFog(this.world);
@@ -232,6 +278,7 @@ export class GameRoom {
       name: p.name,
       color: p.color,
       alive: p.alive,
+      team: p.team,
     }));
   }
 

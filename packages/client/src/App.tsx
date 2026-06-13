@@ -16,6 +16,13 @@ export function App() {
   const endStats = useStore((s) => s.endStats);
   const reconnecting = useStore((s) => s.reconnecting);
 
+  // Team-aware outcome: a teammate winning is still a victory for me.
+  const roster = endPlayers.length ? endPlayers : players;
+  const winnerTeam = winner !== null ? roster.find((p) => p.id === winner)?.team : undefined;
+  const myTeam = roster.find((p) => p.id === myId)?.team;
+  const iWon = winner !== null && winnerTeam !== undefined && winnerTeam === myTeam;
+  const winners = winnerTeam !== undefined ? roster.filter((p) => p.team === winnerTeam) : [];
+
   useEffect(() => {
     connect();
   }, [connect]);
@@ -30,9 +37,9 @@ export function App() {
     }
     if (playedEnd.current) return;
     playedEnd.current = true;
-    if (winner === myId) sfx.win();
+    if (iWon) sfx.win();
     else sfx.lose();
-  }, [phase, winner, myId]);
+  }, [phase, iWon]);
 
   return (
     <>
@@ -57,17 +64,19 @@ export function App() {
       {phase === "over" && (
         <div className="screen center over-screen">
           <div className="card wide">
-            <h1>{winner === myId ? "Victory! 🏆" : "Game over"}</h1>
+            <h1>{iWon ? "Victory! 🏆" : "Game over"}</h1>
             <p className="muted">
-              {winner === null
+              {winner === null || winners.length === 0
                 ? "No survivors."
-                : `Winner: ${(endPlayers.length ? endPlayers : players).find((p) => p.id === winner)?.name ?? `Player ${winner + 1}`}`}
+                : winners.length > 1
+                  ? `Winners: ${winners.map((w) => w.name).join(" & ")}`
+                  : `Winner: ${winners[0].name}`}
             </p>
             {endStats.length > 0 && (
               <Scoreboard
-                players={endPlayers.length ? endPlayers : players}
+                players={roster}
                 stats={endStats}
-                winner={winner}
+                winnerTeam={winnerTeam}
                 myId={myId}
               />
             )}
@@ -84,21 +93,22 @@ export function App() {
 function Scoreboard({
   players,
   stats,
-  winner,
+  winnerTeam,
   myId,
 }: {
   players: PlayerPublic[];
   stats: PlayerStats[];
-  winner: number | null;
+  winnerTeam: number | undefined;
   myId: number | null;
 }) {
-  // Winner first, then by resources gathered (a rough "economy" rank).
+  // Winning team first, then by resources gathered (a rough "economy" rank).
   const rows = players
     .map((p) => ({ p, s: stats[p.id] }))
     .filter((r) => r.s)
     .sort((a, b) => {
-      if (a.p.id === winner) return -1;
-      if (b.p.id === winner) return 1;
+      const aw = a.p.team === winnerTeam ? 1 : 0;
+      const bw = b.p.team === winnerTeam ? 1 : 0;
+      if (aw !== bw) return bw - aw;
       return b.s.resourcesGathered - a.s.resourcesGathered;
     });
   return (
@@ -115,11 +125,11 @@ function Scoreboard({
       </thead>
       <tbody>
         {rows.map(({ p, s }) => (
-          <tr key={p.id} className={p.id === winner ? "winner" : ""}>
+          <tr key={p.id} className={p.team === winnerTeam ? "winner" : ""}>
             <td>
               <span className="dot" style={{ background: p.color }} />
               {p.name}
-              {p.id === winner ? " 🏆" : ""}
+              {p.team === winnerTeam ? " 🏆" : ""}
               {p.id === myId ? " (you)" : ""}
             </td>
             <td>{s.unitsTrained}</td>

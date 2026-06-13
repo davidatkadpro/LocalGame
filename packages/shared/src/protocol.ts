@@ -16,6 +16,8 @@ import type {
 
 // ---------- Lobby ----------
 
+export type GameMode = "ffa" | "2v2";
+
 export interface LobbySlot {
   playerId: PlayerId;
   name: string;
@@ -23,11 +25,14 @@ export interface LobbySlot {
   ready: boolean;
   connected: boolean;
   isHost: boolean;
+  /** team id (used in 2v2; in FFA every slot is its own team) */
+  team: number;
 }
 
 export interface LobbyState {
   slots: LobbySlot[];
   canStart: boolean;
+  mode: GameMode;
 }
 
 // ---------- Snapshot DTOs (fog-filtered, sent each tick) ----------
@@ -79,6 +84,7 @@ export interface PlayerPublic {
   name: string;
   color: string;
   alive: boolean;
+  team: number;
 }
 
 export interface Snapshot {
@@ -125,6 +131,8 @@ export type ClientMessage =
   | { t: "join"; name: string; clientId?: string }
   | { t: "setColor"; color: string }
   | { t: "setReady"; ready: boolean }
+  | { t: "setMode"; mode: GameMode } // host only
+  | { t: "setTeam"; target: PlayerId; team: number } // host only
   | { t: "startGame" }
   | { t: "command"; cmd: Command };
 
