@@ -365,6 +365,29 @@ function findOpenBlock(world: ReturnType<typeof createWorld>, size: number): { x
   check("stats: peakPop tracks starting pop", world.stats[0].peakPop >= 3);
 }
 
+// ---- 10b. rally onto a resource node -> new workers auto-gather ------------
+{
+  const world = createWorld(7, PS);
+  const fog = createFog(world);
+  const tc = world.buildings.find((b) => b.owner === 0 && b.type === "town_center")!;
+  // nearest wood node to the town center
+  let node = world.resourceNodes.find((n) => n.kind === "wood")!;
+  let best = Infinity;
+  for (const n of world.resourceNodes) {
+    if (n.kind !== "wood") continue;
+    const d = Math.hypot(n.tile.x - tc.tile.x, n.tile.y - tc.tile.y);
+    if (d < best) { best = d; node = n; }
+  }
+  applyCommand(world, 0, { c: "rally", building: tc.id, tile: { x: node.tile.x, y: node.tile.y } });
+  // queue a worker and let it pop
+  applyCommand(world, 0, { c: "train", building: tc.id, unit: "worker" });
+  const beforeIds = new Set(world.units.map((u) => u.id));
+  for (let i = 0; i < Math.ceil(UNIT_DEFS.worker.trainMs / 100) + 3; i++) tick(world, fog);
+  const fresh = world.units.find((u) => u.owner === 0 && !beforeIds.has(u.id));
+  check("a rallied worker spawns", !!fresh);
+  check("rallied-to-node worker auto-targets the node", fresh?.targetEntity === node.id);
+}
+
 // ---- 11. eliminated players spectate with full vision ----------------------
 {
   const world = createWorld(7, PS);

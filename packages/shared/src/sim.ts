@@ -597,6 +597,16 @@ export function tick(world: World, fog: Fog): void {
   updateVision(world, fog);
 }
 
+/** A gatherable node sitting on tile (x,y) for `owner`: neutral (any non-empty)
+ *  or the owner's own farm node. Used for rally-to-resource auto-gathering. */
+function gatherableNodeAt(world: World, x: number, y: number, owner: PlayerId) {
+  return (
+    world.resourceNodes.find(
+      (n) => n.tile.x === x && n.tile.y === y && (n.amount > 0 || n.owner === owner),
+    ) ?? null
+  );
+}
+
 function spawnFromBuilding(world: World, b: Building, type: UnitType) {
   const d = BUILDING_DEFS[b.type].size;
   // spawn just outside the footprint, on a walkable tile if possible
@@ -605,9 +615,20 @@ function spawnFromBuilding(world: World, b: Building, type: UnitType) {
   const u = makeUnit(world, b.owner, type, pos);
   world.stats[b.owner].unitsTrained++;
   if (b.rally) {
-    u.state = "moving";
-    u.targetTile = { x: Math.floor(b.rally.x), y: Math.floor(b.rally.y) };
-    u.path = findPath(world.map, u.pos, b.rally, buildingBlocker(world));
+    const rt = { x: Math.floor(b.rally.x), y: Math.floor(b.rally.y) };
+    // Worker rallied onto a resource node? Auto-start gathering it instead of
+    // just walking to the flag and idling.
+    const node = type === "worker" ? gatherableNodeAt(world, rt.x, rt.y, b.owner) : null;
+    if (node) {
+      u.state = "moving";
+      u.targetEntity = node.id;
+      u.lastGatherNode = node.id;
+      u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world));
+    } else {
+      u.state = "moving";
+      u.targetTile = rt;
+      u.path = findPath(world.map, u.pos, b.rally, buildingBlocker(world));
+    }
   }
   world.units.push(u);
 }

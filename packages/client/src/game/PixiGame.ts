@@ -567,12 +567,19 @@ export class PixiGame {
           color: 0xffffff,
           alpha: 0.9,
         });
-        // rally point + line
+        // rally point + line. Green when it sits on a resource node — new
+        // workers will auto-gather it instead of just walking there.
         if (b.rallyX !== undefined && b.rallyY !== undefined) {
           const cx = b.tx + def.size.w / 2;
           const cy = b.ty + def.size.h / 2;
-          g.moveTo(cx, cy).lineTo(b.rallyX, b.rallyY).stroke({ width: 0.05, color: 0xffffff, alpha: 0.5 });
-          g.circle(b.rallyX, b.rallyY, 0.22).fill({ color: 0xffffff, alpha: 0.85 });
+          const rtx = Math.floor(b.rallyX);
+          const rty = Math.floor(b.rallyY);
+          const onNode = snap?.resources.some(
+            (n) => n.tx === rtx && n.ty === rty && (n.owner === undefined || n.owner === this.me()),
+          );
+          const col = onNode ? 0x51cf66 : 0xffffff;
+          g.moveTo(cx, cy).lineTo(b.rallyX, b.rallyY).stroke({ width: 0.05, color: col, alpha: 0.5 });
+          g.circle(b.rallyX, b.rallyY, 0.22).fill({ color: col, alpha: 0.85 });
         }
       }
     }
