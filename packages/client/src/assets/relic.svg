@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- A neutral, glowing reliquary. The owner's colour is drawn as a ring in the
+       renderer (relics have no team-tint accent layer). -->
+  <defs>
+    <radialGradient id="relGlow" cx="0.5" cy="0.45" r="0.55">
+      <stop offset="0" stop-color="#fff6cf" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#fff6cf" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="relBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#c8941d"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="50" cy="90" rx="26" ry="5" fill="#000000" opacity="0.18"/>
+  <!-- radiant aura -->
+  <circle cx="50" cy="50" r="40" fill="url(#relGlow)"/>
+  <!-- pedestal -->
+  <rect x="34" y="78" width="32" height="8" rx="2" fill="#7a6a4a"/>
+  <rect x="38" y="72" width="24" height="8" rx="1" fill="#8b7a55"/>
+  <!-- reliquary body (an ornate golden ark) -->
+  <path d="M40 72 L40 40 L50 28 L60 40 L60 72 Z" fill="url(#relBody)"/>
+  <path d="M50 28 L60 40 L60 72 L50 72 Z" fill="#000000" opacity="0.12"/>
+  <!-- emblem -->
+  <rect x="48" y="44" width="4" height="20" fill="#fff6cf"/>
+  <rect x="43" y="50" width="14" height="4" fill="#fff6cf"/>
+  <!-- sparkles -->
+  <circle cx="50" cy="22" r="3" fill="#ffffff" opacity="0.9"/>
+  <path d="M68 34 l1.5 4 l4 1.5 l-4 1.5 l-1.5 4 l-1.5 -4 l-4 -1.5 l4 -1.5Z" fill="#ffffff" opacity="0.8"/>
+</svg>

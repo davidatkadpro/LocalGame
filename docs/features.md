@@ -698,7 +698,7 @@ selection's posture; patrol arms like attack-move (HUD button or **P**, then
 click). Sim-tested in [stances.test.ts](scripts/stances.test.ts) (24 checks).
 Map objectives (§7.10) remain the last open item in this batch.
 
-### 7.10 Map objectives — Relics & a Wonder victory  — 🆕 **L**
+### 7.10 Map objectives — Relics & a Wonder victory  — ✅ **L**
 
 A non-annihilation win path: capturable **relics/monuments** that trickle gold
 to the holder, and/or a **Wonder** building that wins if it survives a countdown.
@@ -707,6 +707,20 @@ Gives team games a comeback/objective layer beyond last-base-standing.
 [sim.ts](packages/shared/src/sim.ts) (capture + `updateWinState`),
 [protocol.ts](packages/shared/src/protocol.ts),
 [Hud.tsx](packages/client/src/ui/Hud.tsx).
+**Status.** ✅ both halves. **Wonder** — an Imperial-age buildable
+(`{ wood 600, gold 500, stone 400 }`, slow 90s raise); finishing it starts a
+6-minute countdown (tunable `WONDER_COUNTDOWN_MS`) that, if it survives, wins for
+the owner's **team** — `updateWinState` checks the Wonder before the usual
+last-team-standing rule, and destroying it (hp→0, removed in cleanup) cancels the
+clock. The countdown rides the snapshot as a top-level `wonder` summary (un-fogged,
+a global threat) and shows as a HUD banner — green for your team, red for an
+enemy's. **Relics** — `RELIC_COUNT` neutral monuments on a ring of contested
+mid-map ground; a unit within `RELIC_CAPTURE_RADIUS` claims one for its team (an
+enemy flips it, two teams contesting freezes it), and a held relic trickles
+`RELIC_GOLD_PER_SEC` gold to the holder (a fractional buffer keeps gold integer).
+Rendered as a glowing reliquary with an owner-coloured ring. New SVGs (wonder +
+banner accent, relic). Sim-tested in [objectives.test.ts](scripts/objectives.test.ts)
+(17 checks). A relic-control *victory* (vs. the gold trickle) is a possible follow-up.
 
 ### Already shipped from this brainstorm
 

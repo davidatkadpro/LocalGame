@@ -26,6 +26,8 @@ import wallTeeUrl from "../assets/wall_tee.svg";
 import wallCrossUrl from "../assets/wall_cross.svg";
 import gateUrl from "../assets/gate.svg";
 import siegeWorkshopUrl from "../assets/siege_workshop.svg";
+import wonderUrl from "../assets/wonder.svg";
+import relicUrl from "../assets/relic.svg";
 import treeUrl from "../assets/tree.svg";
 import goldUrl from "../assets/gold.svg";
 import stoneUrl from "../assets/stone.svg";
@@ -55,6 +57,7 @@ import farmAccentUrl from "../assets/farm_accent.svg";
 import wallAccentUrl from "../assets/wall_accent.svg";
 import gateAccentUrl from "../assets/gate_accent.svg";
 import siegeWorkshopAccentUrl from "../assets/siege_workshop_accent.svg";
+import wonderAccentUrl from "../assets/wonder_accent.svg";
 
 export type SpriteKey =
   | "worker"
@@ -85,6 +88,8 @@ export type SpriteKey =
   | "wall_cross"
   | "gate"
   | "siege_workshop"
+  | "wonder"
+  | "relic"
   | "tree"
   | "gold"
   | "stone"
@@ -112,7 +117,8 @@ export type SpriteKey =
   | "farm_accent"
   | "wall_accent"
   | "gate_accent"
-  | "siege_workshop_accent";
+  | "siege_workshop_accent"
+  | "wonder_accent";
 
 const URLS: Record<SpriteKey, string> = {
   worker: workerUrl,
@@ -145,6 +151,8 @@ const URLS: Record<SpriteKey, string> = {
   wall_cross: wallCrossUrl,
   gate: gateUrl,
   siege_workshop: siegeWorkshopUrl,
+  wonder: wonderUrl,
+  relic: relicUrl,
   tree: treeUrl,
   gold: goldUrl,
   stone: stoneUrl,
@@ -173,6 +181,7 @@ const URLS: Record<SpriteKey, string> = {
   wall_accent: wallAccentUrl,
   gate_accent: gateAccentUrl,
   siege_workshop_accent: siegeWorkshopAccentUrl,
+  wonder_accent: wonderAccentUrl,
 };
 
 /** Whether a sprite type has a team-colour accent layer. */

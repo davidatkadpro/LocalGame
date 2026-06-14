@@ -69,6 +69,10 @@ export class PixiGame {
   private terrainLayer = new Graphics();
   private fogLayer = new Graphics();
   private resourceLayer = new Container();
+  // §7.10 relics: neutral capturable monuments + an owner-coloured ring.
+  private relicLayer = new Container();
+  private relicSprites = new Map<number, Sprite>();
+  private relicRings = new Graphics();
   // Units and buildings share one container so they can be depth-sorted (by
   // their feet/bottom edge) — a unit standing behind a building draws behind it.
   private entityLayer = new Container();
@@ -163,9 +167,11 @@ export class PixiGame {
     await loadAssets();
 
     this.entityLayer.sortableChildren = true; // sort by zIndex (feet depth) each render
+    this.relicLayer.addChild(this.relicRings); // rings render under the relic sprites
     this.world.addChild(
       this.terrainLayer,
       this.resourceLayer,
+      this.relicLayer,
       this.selectionLayer,
       this.entityLayer,
       this.projLayer,
@@ -393,6 +399,7 @@ export class PixiGame {
 
     this.pruneSelection(st.curr);
     this.reconcileResources(st.curr);
+    this.reconcileRelics(st.curr);
     this.reconcileBuildings(st.curr, st);
     this.reconcileUnits(st.prev, st.curr);
     this.reconcileAnimals(st.prev, st.curr);
@@ -835,6 +842,39 @@ export class PixiGame {
         sp.destroy();
         this.resourceSprites.delete(id);
         this.resourceMax.delete(id);
+      }
+    }
+  }
+
+  /** §7.10 Relics: a sprite per relic plus a ring — the holder's colour when
+   *  owned, a faint pulsing gold when neutral. Relics are static and always sent. */
+  private reconcileRelics(curr: Snapshot): void {
+    const seen = new Set<number>();
+    this.relicRings.clear();
+    for (const r of curr.relics) {
+      seen.add(r.id);
+      let sp = this.relicSprites.get(r.id);
+      if (!sp) {
+        sp = new Sprite(textures.relic);
+        sp.anchor.set(0.5);
+        sp.width = sp.height = 0.95;
+        this.relicLayer.addChild(sp);
+        this.relicSprites.set(r.id, sp);
+      }
+      const cx = r.tx + 0.5;
+      const cy = r.ty + 0.5;
+      sp.position.set(cx, cy);
+      if (r.owner !== undefined) {
+        this.relicRings.circle(cx, cy, 0.52).stroke({ width: 0.09, color: this.colorOf(r.owner), alpha: 0.85 });
+      } else {
+        const pulse = 0.5 + 0.5 * Math.sin(this.now / 350);
+        this.relicRings.circle(cx, cy, 0.5).stroke({ width: 0.06, color: 0xffe9a8, alpha: 0.4 + 0.35 * pulse });
+      }
+    }
+    for (const [id, sp] of this.relicSprites) {
+      if (!seen.has(id)) {
+        sp.destroy();
+        this.relicSprites.delete(id);
       }
     }
   }

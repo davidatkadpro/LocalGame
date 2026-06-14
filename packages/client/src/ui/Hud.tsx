@@ -71,6 +71,7 @@ export const BUILDING_LABEL: Record<BuildingType, string> = {
   fortified_wall: "Fortified Wall",
   gate: "Gate",
   siege_workshop: "Siege Workshop",
+  wonder: "Wonder",
 };
 
 const BUILDABLE = Object.values(BUILDING_DEFS).filter((d) => d.buildable);
@@ -84,7 +85,14 @@ const BUILDING_HINT: Partial<Record<BuildingType, string>> = {
   wall: "Cheap wooden palisade — drag to lay a line",
   stone_wall: "Sturdy stone wall (needs stone) — drag to lay a line",
   fortified_wall: "Toughest wall, shrugs off rams (lots of stone) — drag a line",
+  wonder: "Imperial win — finish it and survive the countdown to win the game",
 };
+
+// m:ss for the Wonder victory countdown.
+function fmtCountdown(ms: number): string {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
 
 // Combat postures, shown as a highlight-the-active toggle row in Commands.
 const STANCES: { id: Stance; icon: string; title: string }[] = [
@@ -110,6 +118,7 @@ export function Hud({
   onToggleMinimap,
 }: HudProps) {
   const snap = useStore((s) => s.curr);
+  const players = useStore((s) => s.players);
   const income = useStore((s) => s.income);
   const selectedUnits = useStore((s) => s.selectedUnits);
   const selectedBuilding = useStore((s) => s.selectedBuilding);
@@ -134,6 +143,9 @@ export function Hud({
   const age = snap?.me.age ?? 0;
 
   const me = snap?.me.playerId;
+  // §7.10 Wonder victory countdown — a global threat surfaced to everyone.
+  const wonder = snap?.wonder ?? null;
+  const myTeam = players.find((p) => p.id === me)?.team;
   const myWorkers = snap
     ? snap.units.filter((u) => u.owner === me && u.type === "worker").length
     : 0;
@@ -210,6 +222,33 @@ export function Hud({
           {muted ? "🔇" : "🔊"}
         </button>
       </div>
+
+      {wonder && (
+        <div
+          className="wonder-banner"
+          title="A finished Wonder wins the game if it survives the countdown"
+          style={{
+            position: "absolute",
+            top: 56,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 50,
+            padding: "5px 14px",
+            borderRadius: 8,
+            whiteSpace: "nowrap",
+            fontWeight: 700,
+            color: "#fff",
+            background: wonder.team === myTeam ? "rgba(39,174,96,0.92)" : "rgba(192,57,43,0.94)",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.45)",
+          }}
+        >
+          {wonder.team === myTeam
+            ? "🏛 Your Wonder stands"
+            : `⚠ ${players.find((p) => p.id === wonder.owner)?.name ?? "Enemy"} is building a Wonder`}
+          {" — "}
+          {fmtCountdown(wonder.msLeft)} to victory
+        </div>
+      )}
 
       {isMobile ? (
         <MobileBottom
