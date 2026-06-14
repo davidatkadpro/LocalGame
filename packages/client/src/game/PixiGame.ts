@@ -702,6 +702,28 @@ export class PixiGame {
         }
       }
     }
+
+    // Status cues: a soft pulsing ring marks my idle workers so they're easy to
+    // spot on the field, and a red ring flags any critically wounded unit.
+    const me = this.me();
+    if (snap) {
+      for (const u of snap.units) {
+        const sp = this.unitSprites.get(u.id);
+        if (!sp) continue;
+        if (u.hp / UNIT_DEFS[u.type as UnitType].hp < 0.34) {
+          g.circle(sp.x, sp.y, 0.5).stroke({ width: 0.06, color: 0xe03131, alpha: 0.85 });
+        }
+        if (
+          u.owner === me &&
+          u.type === "worker" &&
+          u.state === "idle" &&
+          !this.selected.has(u.id)
+        ) {
+          const a = 0.35 + 0.2 * Math.sin(this.now / 180 + u.id);
+          g.circle(sp.x, sp.y, 0.46).stroke({ width: 0.05, color: 0xffd166, alpha: a });
+        }
+      }
+    }
   }
 
   /** Nearest enemy unit to a point within `range`, from the current snapshot. */

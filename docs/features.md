@@ -626,12 +626,14 @@ stream), so it's **deterministic-safe** — no sim change.
 **Files.** [PixiGame.ts](packages/client/src/game/PixiGame.ts),
 [audio.ts](packages/client/src/game/audio.ts).
 
-### 8.2 On-map unit-state clarity  — 🆕 **S**
+### 8.2 On-map unit-state clarity  — 🆕 **S** — ✅ done
 
 A subtle pulsing ring on **idle workers**, a red outline on **low-HP** units, and
 a gather/return indicator. We can already *cycle* idle workers but can't *see*
 them on the field. Client-only.
 **Files.** [PixiGame.ts](packages/client/src/game/PixiGame.ts).
+**Status.** Amber pulsing ring on my idle workers (hidden when selected) + red
+ring on any unit under 34% HP, drawn in the existing selection pass.
 
 ### 8.3 Income rate + villager allocation readout  — 🔨 **S–M**
 
