@@ -1,4 +1,4 @@
-﻿import { ANIMAL_DEFS, MAP_HEIGHT, MAP_WIDTH, RESOURCE_NODE_AMOUNT } from "./constants";
+﻿import { ANIMAL_DEFS, MAP_HEIGHT, MAP_WIDTH, RELIC_COUNT, RESOURCE_NODE_AMOUNT } from "./constants";
 import { inBounds, tileIndex } from "./geometry";
 import { createRng } from "./rng";
 import type {
@@ -6,6 +6,7 @@ import type {
   AnimalKind,
   EntityId,
   GameMap,
+  Relic,
   ResourceKind,
   ResourceNode,
   Terrain,
@@ -17,6 +18,8 @@ export interface GeneratedMap {
   resourceNodes: ResourceNode[];
   /** neutral wandering wildlife */
   animals: Animal[];
+  /** neutral capturable relics (§7.10) on contested mid-map ground */
+  relics: Relic[];
   /** one spawn (town-center top-left tile) per player slot */
   spawns: Vec2[];
   nextEntityId: EntityId;
@@ -252,6 +255,36 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
     placeAnimalsNear(cx, cy, 1, "cow", 3);
   }
 
-  return { map, resourceNodes, animals, spawns, nextEntityId };
+  // ---- Relics: neutral capturable monuments on contested mid-map ground ----
+  // Spread evenly on a ring around the centre (between the corners and the prize
+  // in the middle), each snapped to the nearest free tile so it dodges
+  // water/rock, resource nodes, spawn zones, and other relics. No rng → stable.
+  const relics: Relic[] = [];
+  const relicFree = (x: number, y: number) =>
+    inBounds(map, x, y) &&
+    tiles[tileIndex(map, x, y)] !== "water" &&
+    tiles[tileIndex(map, x, y)] !== "rock" &&
+    !nearSpawn(x, y) &&
+    !resourceNodes.some((n) => n.tile.x === x && n.tile.y === y) &&
+    !relics.some((r) => r.tile.x === x && r.tile.y === y);
+  const rcx = Math.floor(width / 2);
+  const rcy = Math.floor(height / 2);
+  const ringR = Math.floor(Math.min(width, height) / 4);
+  for (let i = 0; i < RELIC_COUNT; i++) {
+    const ang = (i / RELIC_COUNT) * Math.PI * 2;
+    const ax = rcx + Math.round(Math.cos(ang) * ringR);
+    const ay = rcy + Math.round(Math.sin(ang) * ringR);
+    let placed: Vec2 | null = null;
+    for (let r = 0; r < Math.max(width, height) && !placed; r++) {
+      for (let dy = -r; dy <= r && !placed; dy++)
+        for (let dx = -r; dx <= r && !placed; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; // ring at radius r
+          if (relicFree(ax + dx, ay + dy)) placed = { x: ax + dx, y: ay + dy };
+        }
+    }
+    if (placed) relics.push({ id: nextEntityId++, tile: placed, accum: 0 });
+  }
+
+  return { map, resourceNodes, animals, relics, spawns, nextEntityId };
 }
 

@@ -32,7 +32,8 @@ export type BuildingType =
   | "stone_wall"
   | "fortified_wall"
   | "gate"
-  | "siege_workshop";
+  | "siege_workshop"
+  | "wonder";
 
 /** Player-wide researches that modify effective stats. Tiered into three lines
  *  (§7.3): attack (sharpened→tempered→honed), armor (padded→leather→plate), and
@@ -87,6 +88,18 @@ export interface Animal {
   vy: number;
   /** ticks remaining on the current heading */
   wanderTimer: number;
+}
+
+/** A neutral, capturable monument (§7.10). Any unit that comes within capture
+ *  range claims it for its team; while held it trickles gold to the owner. It is
+ *  static — placed at map gen, occupies a 1×1 tile, and is never removed. */
+export interface Relic {
+  id: EntityId;
+  tile: Vec2; // integer tile coords
+  /** controlling player (their team collects the gold); undefined = neutral */
+  owner?: PlayerId;
+  /** fractional gold buffer; whole gold is paid to the owner as this crosses 1 */
+  accum: number;
 }
 
 export type UnitState =
@@ -173,6 +186,10 @@ export interface Building {
   attackCooldown: number;
   /** for farms: id of the hosted, regenerating food node it spawned when built */
   farmNodeId?: EntityId | null;
+  /** §7.10 Wonder victory: ms remaining on the win countdown once the wonder is
+   *  complete (undefined for non-wonders / still building). Reaches 0 → the
+   *  owner's team wins; destroying the wonder removes it and cancels the clock. */
+  wonderTimer?: number;
 }
 
 export interface Player {
@@ -214,6 +231,8 @@ export interface World {
   resourceNodes: ResourceNode[];
   /** neutral wandering wildlife (sheep/cows) workers can hunt for food */
   animals: Animal[];
+  /** neutral capturable relics that trickle gold to whoever holds them (§7.10) */
+  relics: Relic[];
   nextEntityId: EntityId;
   winner: PlayerId | null;
   /** per-player cumulative stats, indexed by PlayerId */

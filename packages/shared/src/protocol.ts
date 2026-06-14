@@ -102,6 +102,14 @@ export interface AnimalDTO {
   hp: number;
 }
 
+export interface RelicDTO {
+  id: number;
+  tx: number;
+  ty: number;
+  /** controlling player (their team collects the gold); absent if neutral */
+  owner?: PlayerId;
+}
+
 export interface PlayerPublic {
   id: PlayerId;
   name: string;
@@ -138,6 +146,11 @@ export interface Snapshot {
   resources: ResourceNodeDTO[];
   /** neutral wandering wildlife currently in view */
   animals: AnimalDTO[];
+  /** neutral capturable relics (§7.10) — always sent as fixed objective markers */
+  relics: RelicDTO[];
+  /** active Wonder victory countdown (the most imminent), surfaced to everyone
+   *  through fog so the threat/comeback pressure is shared */
+  wonder?: { owner: PlayerId; team: number; msLeft: number; msTotal: number };
 }
 
 // ---------- Commands (client intents) ----------

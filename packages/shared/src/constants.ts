@@ -22,6 +22,15 @@ export const PLAYER_COLORS = ["#e6492d", "#2d7fe6", "#27ae60", "#f1c40f"];
 export const MAP_WIDTH = 64;
 export const MAP_HEIGHT = 64;
 
+// ---- §7.10 Map objectives ----
+// A completed Wonder starts this countdown; if it survives, the owner's team
+// wins outright (a non-annihilation victory). Long enough to be answerable.
+export const WONDER_COUNTDOWN_MS = 360_000; // 6 minutes
+// Relics: neutral monuments that pay gold to whoever currently holds them.
+export const RELIC_COUNT = 4; // placed on contested ground at map gen
+export const RELIC_CAPTURE_RADIUS = 1.5; // a unit this close (tiles) claims it
+export const RELIC_GOLD_PER_SEC = 0.5; // gold/sec trickled to the holding player
+
 // ---- Economy ----
 // Stone is the defensive resource (towers / fortifications); a small starter
 // stock lets a Feudal player raise their first tower without mining first.
@@ -407,6 +416,22 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     canTrain: ["ram", "mangonel", "trebuchet"], // gates siege behind a dedicated tech building
     buildable: true,
     minAge: 2, // Imperial
+  },
+  wonder: {
+    type: "wonder",
+    hp: 1500,
+    sight: 6,
+    size: { w: 3, h: 3 },
+    // §7.10 — an alternate, non-annihilation win. Hugely expensive across every
+    // resource (you trade an army's worth of economy to race the clock) and very
+    // slow to raise, so the enemy gets real time to mount an assault. Tunable.
+    cost: { wood: 600, gold: 500, stone: 400 },
+    buildMs: 90000,
+    providesPop: 0,
+    isDropOff: false,
+    canTrain: [],
+    buildable: true,
+    minAge: 2, // Imperial only
   },
 };
 

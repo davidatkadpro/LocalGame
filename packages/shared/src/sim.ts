@@ -9,8 +9,11 @@ import {
   BUILDING_DEFS,
   CARRY_CAPACITY,
   HARD_POP_CAP,
+  RELIC_CAPTURE_RADIUS,
+  RELIC_GOLD_PER_SEC,
   STARTING_RESOURCES,
   TICK_DT,
+  WONDER_COUNTDOWN_MS,
   UNIT_DEFS,
   UPGRADE_DEFS,
   campBonusFor,
@@ -90,6 +93,7 @@ export function createWorld(seed: number, playerSeeds: PlayerSeed[]): World {
     buildings: [],
     resourceNodes: gen.resourceNodes,
     animals: gen.animals,
+    relics: gen.relics,
     nextEntityId: gen.nextEntityId,
     winner: null,
     stats: playerSeeds.map(() => ({
@@ -867,6 +871,16 @@ export function tick(world: World, fog: Fog): void {
     if (node) node.amount = Math.min(fdef.capacity, node.amount + fdef.regenPerSec * TICK_DT);
   }
 
+  // §7.10 objectives: count down each completed Wonder's victory clock, and let
+  // relics pay gold to whoever holds them. (The Wonder win is decided below in
+  // updateWinState; destroying the Wonder removes it during cleanup, cancelling.)
+  for (const b of world.buildings) {
+    if (b.type === "wonder" && b.progress >= 1 && b.wonderTimer != null && b.wonderTimer > 0) {
+      b.wonderTimer -= TICK_DT * 1000;
+    }
+  }
+  tickRelics(world);
+
   // defensive buildings (towers) auto-attack the nearest enemy in range
   tickTowers(world);
 
@@ -1481,6 +1495,8 @@ function chainToNextWall(world: World, u: Unit, wallType: BuildingType): boolean
 /** One-time setup when a building finishes: farms spawn their food node. */
 function onBuildingComplete(world: World, b: Building): void {
   world.stats[b.owner].buildingsBuilt++;
+  // §7.10: a finished Wonder starts ticking its victory countdown.
+  if (b.type === "wonder") b.wonderTimer = WONDER_COUNTDOWN_MS;
   const def = BUILDING_DEFS[b.type];
   if (def.farm && (b.farmNodeId === undefined || b.farmNodeId === null)) {
     const node = {
@@ -1747,7 +1763,54 @@ function recomputePop(world: World): void {
   }
 }
 
+/**
+ * §7.10 Relics: each tick, the single uncontested team with a unit in capture
+ * range claims a relic (an enemy team flips it; a friendly unit just holds it),
+ * and a held relic trickles gold to its owning player. Contested (two teams in
+ * range) or an empty radius freezes ownership.
+ */
+function tickRelics(world: World): void {
+  const grant = RELIC_GOLD_PER_SEC * TICK_DT;
+  for (const relic of world.relics) {
+    const center = { x: relic.tile.x + 0.5, y: relic.tile.y + 0.5 };
+    const inRange = world.units.filter(
+      (u) => u.hp > 0 && dist(u.pos, center) <= RELIC_CAPTURE_RADIUS,
+    );
+    const teams = new Set(inRange.map((u) => world.players[u.owner].team));
+    const ownerTeam = relic.owner !== undefined ? world.players[relic.owner]?.team : undefined;
+    if (teams.size === 1) {
+      const team = [...teams][0];
+      // Only (re)claim when a *different* team holds the ground; a friendly unit
+      // standing on our own relic just keeps it. Deterministic claimant: the
+      // lowest-id in-range unit of the claiming team.
+      if (team !== ownerTeam) {
+        const claimant = inRange
+          .filter((u) => world.players[u.owner].team === team)
+          .reduce((lo, u) => (u.id < lo.id ? u : lo));
+        relic.owner = claimant.owner;
+      }
+    }
+    if (relic.owner !== undefined && world.players[relic.owner]) {
+      relic.accum += grant;
+      if (relic.accum >= 1) {
+        const whole = Math.floor(relic.accum);
+        world.players[relic.owner].resources.gold += whole;
+        relic.accum -= whole;
+      }
+    }
+  }
+}
+
 function updateWinState(world: World): void {
+  // §7.10 Wonder victory takes precedence over annihilation: a completed wonder
+  // whose countdown has elapsed wins the match for its owner's team.
+  const wonder = world.buildings.find(
+    (b) => b.type === "wonder" && b.progress >= 1 && b.wonderTimer != null && b.wonderTimer <= 0,
+  );
+  if (wonder) {
+    world.winner = wonder.owner;
+    return;
+  }
   for (const p of world.players) {
     if (!p.alive) continue;
     // Resigned -> eliminated (sticky, regardless of remaining buildings/units).
@@ -1932,6 +1995,29 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
     .filter((a) => reveal || seesTile(Math.floor(a.pos.x), Math.floor(a.pos.y)))
     .map((a) => ({ id: a.id, kind: a.kind, x: a.pos.x, y: a.pos.y, hp: a.hp }));
 
+  // Relics are fixed objective markers — always sent (no fog gating).
+  const relics = world.relics.map((r) => ({
+    id: r.id,
+    tx: r.tile.x,
+    ty: r.tile.y,
+    ...(r.owner !== undefined ? { owner: r.owner } : {}),
+  }));
+
+  // The most imminent active Wonder countdown, surfaced to everyone — a global
+  // victory threat that drives defenders to respond before the clock runs out.
+  let wonder: Snapshot["wonder"];
+  for (const b of world.buildings) {
+    if (b.type !== "wonder" || b.progress < 1 || b.wonderTimer == null) continue;
+    if (!wonder || b.wonderTimer < wonder.msLeft) {
+      wonder = {
+        owner: b.owner,
+        team: world.players[b.owner].team,
+        msLeft: Math.max(0, b.wonderTimer),
+        msTotal: WONDER_COUNTDOWN_MS,
+      };
+    }
+  }
+
   return {
     tick: world.tick,
     visible: bytesToBase64(visMask),
@@ -1953,6 +2039,8 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
     buildings,
     resources,
     animals,
+    relics,
+    ...(wonder ? { wonder } : {}),
   };
 }
 
