@@ -267,21 +267,29 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
     !nearSpawn(x, y) &&
     !resourceNodes.some((n) => n.tile.x === x && n.tile.y === y) &&
     !relics.some((r) => r.tile.x === x && r.tile.y === y);
+  // Nearest free tile to (ax,ay) by an outward ring scan. maxR spans the whole
+  // map, so a relic is always placed as long as *any* free tile exists — on a
+  // normal grass map that yields exactly RELIC_COUNT relics; a pathological
+  // all-water map simply yields fewer (never a crash, never an infinite loop).
+  const nearestFreeTile = (ax: number, ay: number): Vec2 | null => {
+    const maxR = Math.max(width, height);
+    for (let r = 0; r < maxR; r++)
+      for (let dy = -r; dy <= r; dy++)
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; // ring at radius r
+          if (relicFree(ax + dx, ay + dy)) return { x: ax + dx, y: ay + dy };
+        }
+    return null;
+  };
   const rcx = Math.floor(width / 2);
   const rcy = Math.floor(height / 2);
   const ringR = Math.floor(Math.min(width, height) / 4);
   for (let i = 0; i < RELIC_COUNT; i++) {
     const ang = (i / RELIC_COUNT) * Math.PI * 2;
-    const ax = rcx + Math.round(Math.cos(ang) * ringR);
-    const ay = rcy + Math.round(Math.sin(ang) * ringR);
-    let placed: Vec2 | null = null;
-    for (let r = 0; r < Math.max(width, height) && !placed; r++) {
-      for (let dy = -r; dy <= r && !placed; dy++)
-        for (let dx = -r; dx <= r && !placed; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; // ring at radius r
-          if (relicFree(ax + dx, ay + dy)) placed = { x: ax + dx, y: ay + dy };
-        }
-    }
+    const placed = nearestFreeTile(
+      rcx + Math.round(Math.cos(ang) * ringR),
+      rcy + Math.round(Math.sin(ang) * ringR),
+    );
     if (placed) relics.push({ id: nextEntityId++, tile: placed, accum: 0 });
   }
 
