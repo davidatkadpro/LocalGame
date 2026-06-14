@@ -140,7 +140,9 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     sight: 4,
     size: { w: 2, h: 2 },
     cost: { wood: 50 },
-    buildMs: 12000,
+    // Pure pop-enabler with no other use; 12s stalled mid-game army growth, so
+    // bring it in line with the storehouse (10s) for a smoother pop curve.
+    buildMs: 10000,
     providesPop: 5,
     isDropOff: false,
     canTrain: [],

@@ -683,13 +683,21 @@ Lerp camera moves (control-group recall and go-to-TC currently hard-snap), and a
 **Status.** Camera now eases to jump targets (recall / go-to-TC / minimap) over
 ~0.3s; manual pan cancels the glide. *Follow-selection toggle still TODO.*
 
-### 8.7 Pacing / balance pass  — 🔨 **M** — *a deliverable in itself*
+### 8.7 Pacing / balance pass  — 🔨 **M** — ✅ first pass done (guardrails + one tweak)
 
 Tune starting eco, train times, pop-house pacing, and unit costs **as a set** for
 a clean ~15-min match arc. Pure data, validated against the sim suite. Best done
 **once the unit roster from §7 is stable** (ages/cavalry/siege all shift the
 numbers).
 **Files.** [constants.ts](packages/shared/src/constants.ts), sim tests.
+**Status.** Analysis found the numbers already internally coherent (multiple
+prior tuning passes: tower nerf, gold-gated soldier, ram counters), so rather
+than risk a blind rebalance the deliverable is **`scripts/balance.test.ts`** —
+19 guardrails locking the intended ratios (archer↔soldier↔ram counters, ram-only
+siege, tower-doesn't-out-range-archers, upgrade magnitudes, eco baseline) so a
+future §7 change can't silently invert them. One defensible tweak: **house build
+time 12s → 10s** (matching the storehouse) so pop growth doesn't stall mid-game.
+The substantive numeric rebalance still waits on §7 + playtests, as sequenced.
 
 ### 8.8 Reconnect / pause for LAN play  — 🆕 **M** — ✅ done
 
