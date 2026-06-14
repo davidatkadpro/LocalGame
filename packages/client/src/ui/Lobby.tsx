@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MAX_PLAYERS, PLAYER_COLORS } from "@bg/shared";
+import { MAX_PLAYERS, PLAYER_COLORS, type LeaderboardEntry } from "@bg/shared";
 import { useStore } from "../net/store";
 
 export function Lobby() {
@@ -148,7 +148,35 @@ export function Lobby() {
               : "Need 2–4 players, all ready, to start."}
           </p>
         )}
+
+        <LobbyLeaderboard entries={lobby?.leaderboard ?? []} />
       </div>
+    </div>
+  );
+}
+
+/** All-time standings (persisted on the host). Shows the top 3 by wins. */
+function LobbyLeaderboard({ entries }: { entries: LeaderboardEntry[] }) {
+  const top = entries.filter((e) => e.games > 0).slice(0, 3);
+  if (top.length === 0) return null;
+  const medal = ["🥇", "🥈", "🥉"];
+  return (
+    <div className="leaderboard">
+      <div className="panel-title">🏆 Leaderboard</div>
+      <ol className="lb-list">
+        {top.map((e, i) => (
+          <li className="lb-row" key={e.name}>
+            <span className="lb-rank">{medal[i] ?? `${i + 1}.`}</span>
+            <span className="lb-name">{e.name}</span>
+            <span className="lb-wins">
+              {e.wins} win{e.wins === 1 ? "" : "s"}
+            </span>
+            <span className="lb-games muted small">
+              {e.games} game{e.games === 1 ? "" : "s"}
+            </span>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

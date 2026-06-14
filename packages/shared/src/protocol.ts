@@ -30,10 +30,19 @@ export interface LobbySlot {
   team: number;
 }
 
+/** A persisted, name-keyed standings row shown on the lobby leaderboard. */
+export interface LeaderboardEntry {
+  name: string;
+  wins: number;
+  games: number;
+}
+
 export interface LobbyState {
   slots: LobbySlot[];
   canStart: boolean;
   mode: GameMode;
+  /** persisted all-time standings (sorted, best first); the lobby shows top 3 */
+  leaderboard: LeaderboardEntry[];
 }
 
 // ---------- Snapshot DTOs (fog-filtered, sent each tick) ----------
@@ -78,6 +87,8 @@ export interface ResourceNodeDTO {
   amount: number;
   /** present for farm-hosted nodes: only this player may harvest it */
   owner?: PlayerId;
+  /** true if this food node is a hunted-animal carcass (rendered as meat) */
+  carcass?: boolean;
 }
 
 export interface AnimalDTO {

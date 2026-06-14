@@ -14,11 +14,13 @@ import {
   type ClientMessage,
   type Fog,
   type GameMode,
+  type LeaderboardEntry,
   type LobbySlot,
   type PlayerPublic,
   type ServerMessage,
   type World,
 } from "@bg/shared";
+import { Leaderboard } from "./leaderboard";
 
 export interface Conn {
   id: number;
@@ -49,6 +51,8 @@ export class GameRoom {
   private loop: ReturnType<typeof setInterval> | null = null;
   private hostPlayerId: number | null = null;
   private conns = new Set<Conn>();
+  // Persisted all-time standings (survives matches and server restarts).
+  private leaderboard = new Leaderboard();
 
   // ---- connection lifecycle ----
 
@@ -200,7 +204,12 @@ export class GameRoom {
     if (slot) fn(slot);
   }
 
-  private lobbyState(): { slots: LobbySlot[]; canStart: boolean; mode: GameMode } {
+  private lobbyState(): {
+    slots: LobbySlot[];
+    canStart: boolean;
+    mode: GameMode;
+    leaderboard: LeaderboardEntry[];
+  } {
     const slots: LobbySlot[] = [...this.slots.entries()]
       .sort((a, b) => a[0] - b[0])
       .map(([playerId, s]) => ({
@@ -221,7 +230,7 @@ export class GameRoom {
       const t1 = slots.filter((s) => s.team === 1).length;
       canStart = allReady && slots.length === 4 && t0 === 2 && t1 === 2;
     }
-    return { slots, canStart, mode: this.mode };
+    return { slots, canStart, mode: this.mode, leaderboard: this.leaderboard.standings() };
   }
 
   /** Seed teams when the mode changes: 2v2 splits current slots 2-and-2; FFA
@@ -319,7 +328,20 @@ export class GameRoom {
     const winner = this.world?.winner ?? null;
     const players = this.world ? this.playersPublic() : [];
     const stats = this.world ? this.world.stats : [];
+    this.recordResult(winner, players);
     for (const s of this.slots.values()) s.conn?.send({ t: "gameOver", winner, players, stats });
+  }
+
+  /** Fold a finished match into the persisted leaderboard (team-aware win). */
+  private recordResult(winner: number | null, players: PlayerPublic[]): void {
+    if (players.length === 0) return;
+    const participants = players.map((p) => p.name);
+    let winners: string[] = [];
+    if (winner !== null) {
+      const wteam = players.find((p) => p.id === winner)?.team;
+      winners = players.filter((p) => p.team === wteam).map((p) => p.name);
+    }
+    this.leaderboard.record(participants, winners);
   }
 
   // ---- helpers ----

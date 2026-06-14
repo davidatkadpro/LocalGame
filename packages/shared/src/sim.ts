@@ -785,6 +785,7 @@ export function tick(world: World, fog: Fog): void {
       kind: "food",
       tile: { x: Math.floor(a.pos.x), y: Math.floor(a.pos.y) },
       amount: a.food,
+      carcass: true,
     });
   }
   world.animals = world.animals.filter((a) => a.hp > 0);
@@ -1718,6 +1719,7 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
       ty: n.tile.y,
       amount: n.amount,
       ...(n.owner !== undefined ? { owner: n.owner } : {}),
+      ...(n.carcass ? { carcass: true } : {}),
     }));
 
   // Animals roam, so gate them on current visibility (like enemy units), not the

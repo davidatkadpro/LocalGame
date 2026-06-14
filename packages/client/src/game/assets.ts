@@ -17,6 +17,7 @@ import goldUrl from "../assets/gold.svg";
 import foodUrl from "../assets/food.svg";
 import sheepUrl from "../assets/sheep.svg";
 import cowUrl from "../assets/cow.svg";
+import meatUrl from "../assets/meat.svg";
 // Team-colour accent layers (white shapes, tinted with the player's colour).
 import workerAccentUrl from "../assets/worker_accent.svg";
 import soldierAccentUrl from "../assets/soldier_accent.svg";
@@ -49,6 +50,7 @@ export type SpriteKey =
   | "food"
   | "sheep"
   | "cow"
+  | "meat"
   | "worker_accent"
   | "soldier_accent"
   | "archer_accent"
@@ -80,6 +82,7 @@ const URLS: Record<SpriteKey, string> = {
   food: foodUrl,
   sheep: sheepUrl,
   cow: cowUrl,
+  meat: meatUrl,
   worker_accent: workerAccentUrl,
   soldier_accent: soldierAccentUrl,
   archer_accent: archerAccentUrl,

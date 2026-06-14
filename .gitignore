@@ -4,3 +4,6 @@ dist/
 .DS_Store
 *.local
 .env
+# persisted host leaderboard + test scratch files
+leaderboard.json
+.tmp-leaderboard.json

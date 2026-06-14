@@ -41,6 +41,8 @@ export interface ResourceNode {
   amount: number; // remaining
   /** owner for farm-hosted nodes (only this player may harvest); undefined = neutral */
   owner?: PlayerId;
+  /** true if this food node is a hunted-animal carcass (rendered as meat) */
+  carcass?: boolean;
 }
 
 /** Wild fauna: neutral animals that wander the map. A worker hunts one (attacks

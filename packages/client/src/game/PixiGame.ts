@@ -546,11 +546,18 @@ export class PixiGame {
       seen.add(n.id);
       let sp = this.resourceSprites.get(n.id);
       if (!sp) {
-        const key: SpriteKey = n.kind === "wood" ? "tree" : n.kind === "gold" ? "gold" : "food";
+        const key: SpriteKey = n.carcass
+          ? "meat"
+          : n.kind === "wood"
+            ? "tree"
+            : n.kind === "gold"
+              ? "gold"
+              : "food";
         sp = new Sprite(textures[key]);
         sp.anchor.set(0.5);
-        sp.width = 0.95;
-        sp.height = 0.95;
+        const s = n.carcass ? 0.72 : 0.95; // a meat pile reads a touch smaller
+        sp.width = s;
+        sp.height = s;
         this.resourceLayer.addChild(sp);
         this.resourceSprites.set(n.id, sp);
       }

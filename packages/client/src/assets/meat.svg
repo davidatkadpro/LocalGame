@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- A hunted animal's carcass: a meat haunch on the bone, to be harvested. -->
+  <defs>
+    <radialGradient id="meat" cx="0.42" cy="0.35" r="0.85">
+      <stop offset="0" stop-color="#e8635f"/>
+      <stop offset="0.6" stop-color="#c2453f"/>
+      <stop offset="1" stop-color="#9c2f2a"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="84" rx="27" ry="5" fill="#000000" opacity="0.2"/>
+  <!-- bone sticking out top-left -->
+  <rect x="22" y="30" width="26" height="11" rx="5.5" fill="#f1ead9" transform="rotate(-32 35 36)"/>
+  <circle cx="24" cy="26" r="6" fill="#f7f1e5"/>
+  <circle cx="20" cy="33" r="5.5" fill="#ece3d0"/>
+  <!-- meat haunch -->
+  <path d="M46 34 C72 30 86 48 79 67 C72 86 44 86 35 69 C28 56 31 38 46 34 Z" fill="url(#meat)"/>
+  <!-- marbling / shine -->
+  <ellipse cx="58" cy="50" rx="6" ry="4" fill="#ffd0cc" opacity="0.75"/>
+  <path d="M48 60 C56 58 66 62 70 70" stroke="#ffb3ae" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+</svg>

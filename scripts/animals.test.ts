@@ -91,5 +91,19 @@ function check(label: string, cond: boolean, detail = "") {
   check("a cow across the map is fogged out", !view.animals.some((an) => an.id === farId));
 }
 
+// ---- 5. a killed animal leaves a carcass food node flagged for the meat art -
+{
+  const world = createWorld(7, [PS[0]]);
+  const fog = createFog(world);
+  const sheep = world.animals.find((an) => an.kind === "sheep")!;
+  const id = sheep.id;
+  sheep.hp = 0; // "killed"
+  tick(world, fog); // cleanup converts it to a carcass food node
+  const carcass = world.resourceNodes.find((n) => n.id === id);
+  check("the carcass is a neutral food node", !!carcass && carcass.kind === "food" && carcass.owner === undefined);
+  check("the carcass is flagged as meat (carcass=true)", !!carcass && carcass.carcass === true);
+  check("the carcass holds the animal's food", !!carcass && carcass.amount === ANIMAL_DEFS.sheep.food);
+}
+
 console.log(pass ? "ANIMALS: PASS ✅" : "ANIMALS: FAIL ❌");
 process.exit(pass ? 0 : 1);
