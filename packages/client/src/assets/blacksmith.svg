@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral base (stone forge + anvil). Banner + hammer emblem are accent. -->
+  <defs>
+    <linearGradient id="bsWall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8c8780"/>
+      <stop offset="1" stop-color="#615d57"/>
+    </linearGradient>
+    <linearGradient id="bsRoof" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a4032"/>
+      <stop offset="1" stop-color="#3a281e"/>
+    </linearGradient>
+    <radialGradient id="bsFire" cx="0.5" cy="0.7" r="0.7">
+      <stop offset="0" stop-color="#ffd24a"/>
+      <stop offset="0.6" stop-color="#f2731f"/>
+      <stop offset="1" stop-color="#a02808"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="94" rx="42" ry="5" fill="#000000" opacity="0.16"/>
+  <!-- banner pole -->
+  <rect x="61" y="8" width="4" height="30" fill="#7b7363"/>
+  <!-- forge building body -->
+  <rect x="14" y="44" width="72" height="48" rx="3" fill="url(#bsWall)"/>
+  <polygon points="10,46 50,26 90,46" fill="url(#bsRoof)"/>
+  <polygon points="50,26 90,46 50,46" fill="#000000" opacity="0.12"/>
+  <!-- chimney with a curl of smoke -->
+  <rect x="22" y="30" width="11" height="18" fill="#4c4842"/>
+  <path d="M27 30 q-5 -7 2 -11 q6 -3 2 -9" stroke="#b9b3aa" stroke-width="2.4" fill="none" opacity="0.5"/>
+  <!-- forge mouth glowing -->
+  <rect x="58" y="60" width="22" height="20" rx="2" fill="#2a211a"/>
+  <ellipse cx="69" cy="72" rx="8" ry="6" fill="url(#bsFire)"/>
+  <!-- anvil out front -->
+  <rect x="24" y="74" width="6" height="12" fill="#3a3a3e"/>
+  <path d="M18 70 L40 70 L36 75 L30 75 L30 73 L24 73 L20 75 L18 75 Z" fill="#55555c"/>
+  <rect x="14" y="86" width="72" height="6" fill="#000000" opacity="0.1"/>
+</svg>

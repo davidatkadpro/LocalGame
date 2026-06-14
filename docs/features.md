@@ -473,15 +473,18 @@ legend: 🆕 brand new · 🔨 expand something we already have · ✅ shipped.
   Counters with building bonuses live in
   [COUNTERS](packages/shared/src/constants.ts#L297) (ram ×5 vs buildings, the
   soldier→cavalry→archer→soldier triangle, etc.).
-- **Buildings:** `town_center`, `house`, `barracks`, `stable`, `tower`,
-  `storehouse` (drop-off), `lumber_camp` / `mining_camp` / `mill` (specialised
-  drop-offs), `farm`, `wall` / `stone_wall` / `fortified_wall` (tiers), `gate`,
-  `siege_workshop`.
+- **Buildings:** `town_center`, `house`, `barracks`, `stable`, `blacksmith`,
+  `tower`, `storehouse` (drop-off), `lumber_camp` / `mining_camp` / `mill`
+  (specialised drop-offs), `farm`, `wall` / `stone_wall` / `fortified_wall`
+  (tiers), `gate`, `siege_workshop`.
 - **Resources:** `wood`, `food`, `gold`, `stone` (4). Food from bushes, farms,
   and hunted animals (sheep/cow → meat carcass); stone is the defensive resource
   (towers/fortifications), contested toward the map centre.
-- **Tech:** a working research system with three flat upgrades —
-  `improvedTools`, `sharpenedBlades`, `paddedArmor`
+- **Tech:** a tiered research system (§7.3 ✅) — three lines of three tiers each:
+  attack (`sharpenedBlades`→`temperedBlades`→`honedBlades`), armor
+  (`paddedArmor`→`leatherArmor`→`plateArmor`), gather
+  (`improvedTools`→`fineTools`→`masterTools`). Combat tiers II/III at the
+  **Blacksmith**, eco tiers at the Town Center
   ([UpgradeId](packages/shared/src/types.ts#L23)).
 - **Systems:** fog/teams, leaderboard, repair/demolish, under-attack alerts +
   minimap pings (§5.2 ✅), stop/H/double-click QoL, resource-depletion visuals.
@@ -532,7 +535,7 @@ storehouse by exactly 1.20×); ratios untouched in `scripts/balance.test.ts`.
 When **7.4 Stone** lands, the Mining Camp extends to stone. Per-camp research
 techs (AoE's gather upgrades) fold naturally into **7.3**'s tiered tree later.
 
-### 7.3 Blacksmith + tiered tech tree  — 🔨 **M**
+### 7.3 Blacksmith + tiered tech tree  — 🔨 **M** — ✅ done
 
 **Have today.** Three flat upgrades researched (likely at the TC).
 **Add.** A dedicated **Blacksmith** building and a *tiered*, age-gated tree
@@ -542,6 +545,20 @@ command into levelled lines.
 **Files.** [types.ts](packages/shared/src/types.ts) (`UpgradeId` lines),
 [constants.ts](packages/shared/src/constants.ts),
 [sim.ts](packages/shared/src/sim.ts), [Hud.tsx](packages/client/src/ui/Hud.tsx).
+**Status.** Shipped **three upgrade lines of three tiers** each (9 upgrades):
+attack `sharpenedBlades`→`temperedBlades`→`honedBlades`, armor
+`paddedArmor`→`leatherArmor`→`plateArmor`, gather
+`improvedTools`→`fineTools`→`masterTools`. Tier I keeps the original magnitudes
+(so existing balance/age tests hold); the effective-stat helpers now apply the
+**highest tier owned** in a line (a line never stacks on itself) via
+`UPGRADE_LINES` + `bestTier`. A new **Blacksmith** (3×3, Feudal, 150 wood / 40
+stone) hosts the combat tiers II/III; eco tiers sit at the Town Center; combat
+tier I stays at the barracks. Each tier `requires` the one below it — enforced
+server-side with a one-line check in the `research` command and surfaced in the
+HUD as a 🔒 lock on the button. Tiers II are Feudal, III Imperial. Covered by
+`scripts/blacksmith.test.ts` (line magnitudes, prereq enforcement, age-gating,
+building wiring); `balance`/`ages` suites still green. Deeper eco techs (+farm
+yield, +worker carry) can extend the gather line later.
 
 ### 7.4 Stone as a 4th resource  — 🆕 **M** — ✅ done
 

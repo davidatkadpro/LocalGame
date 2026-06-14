@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Team-colour accent: tinted with the player's colour. -->
+  <defs>
+    <linearGradient id="acc" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cccccc"/>
+    </linearGradient>
+  </defs>
+  <!-- banner flying from the pole (pole is in the base) -->
+  <polygon points="65,10 86,16 65,22 70,16" fill="url(#acc)"/>
+  <!-- crossed hammer + tongs emblem over the door -->
+  <g stroke="url(#acc)" stroke-width="3" stroke-linecap="round">
+    <line x1="42" y1="52" x2="52" y2="62"/>
+    <line x1="54" y1="52" x2="44" y2="62"/>
+  </g>
+  <rect x="49" y="49" width="6" height="5" rx="1" fill="url(#acc)" transform="rotate(45 52 51)"/>
+</svg>

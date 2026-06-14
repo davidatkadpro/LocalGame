@@ -55,6 +55,7 @@ export const BUILDING_LABEL: Record<BuildingType, string> = {
   house: "House",
   barracks: "Barracks",
   stable: "Stable",
+  blacksmith: "Blacksmith",
   tower: "Guard Tower",
   storehouse: "Storehouse",
   lumber_camp: "Lumber Camp",
@@ -829,17 +830,27 @@ function BuildingPanel({
               const poor = !canAfford(resources, u.cost);
               const needAge = minAgeOfUpgrade(id);
               const locked = age < needAge;
+              // Tiered tech (§7.3): the previous tier in this line must be owned.
+              const needsPrereq = !!u.requires && !owned.includes(u.requires);
               return (
                 <button
                   key={id}
-                  title={locked ? `Unlocks in the ${AGE_DEFS[needAge].name}` : u.blurb}
-                  disabled={have || busy || poor || locked}
+                  title={
+                    locked
+                      ? `Unlocks in the ${AGE_DEFS[needAge].name}`
+                      : needsPrereq
+                        ? `Research ${UPGRADE_DEFS[u.requires!].name} first`
+                        : u.blurb
+                  }
+                  disabled={have || busy || poor || locked || needsPrereq}
                   onClick={() => command({ c: "research", building: building.id, upgrade: id })}
                 >
                   {have ? "✓ " : ""}
                   {u.name}{" "}
                   {have ? null : locked ? (
                     <span className="muted small">🔒 {AGE_DEFS[needAge].name.split(" ")[0]}</span>
+                  ) : needsPrereq ? (
+                    <span className="muted small">🔒 {UPGRADE_DEFS[u.requires!].name}</span>
                   ) : (
                     <CostBadge cost={u.cost} />
                   )}

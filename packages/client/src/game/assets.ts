@@ -9,6 +9,7 @@ import townCenterUrl from "../assets/town_center.svg";
 import houseUrl from "../assets/house.svg";
 import barracksUrl from "../assets/barracks.svg";
 import stableUrl from "../assets/stable.svg";
+import blacksmithUrl from "../assets/blacksmith.svg";
 import towerUrl from "../assets/tower.svg";
 import storehouseUrl from "../assets/storehouse.svg";
 import lumberCampUrl from "../assets/lumber_camp.svg";
@@ -40,6 +41,7 @@ import townCenterAccentUrl from "../assets/town_center_accent.svg";
 import houseAccentUrl from "../assets/house_accent.svg";
 import barracksAccentUrl from "../assets/barracks_accent.svg";
 import stableAccentUrl from "../assets/stable_accent.svg";
+import blacksmithAccentUrl from "../assets/blacksmith_accent.svg";
 import towerAccentUrl from "../assets/tower_accent.svg";
 import storehouseAccentUrl from "../assets/storehouse_accent.svg";
 import lumberCampAccentUrl from "../assets/lumber_camp_accent.svg";
@@ -60,6 +62,7 @@ export type SpriteKey =
   | "house"
   | "barracks"
   | "stable"
+  | "blacksmith"
   | "tower"
   | "storehouse"
   | "lumber_camp"
@@ -92,6 +95,7 @@ export type SpriteKey =
   | "house_accent"
   | "barracks_accent"
   | "stable_accent"
+  | "blacksmith_accent"
   | "tower_accent"
   | "storehouse_accent"
   | "lumber_camp_accent"
@@ -112,6 +116,7 @@ const URLS: Record<SpriteKey, string> = {
   house: houseUrl,
   barracks: barracksUrl,
   stable: stableUrl,
+  blacksmith: blacksmithUrl,
   tower: towerUrl,
   storehouse: storehouseUrl,
   lumber_camp: lumberCampUrl,
@@ -146,6 +151,7 @@ const URLS: Record<SpriteKey, string> = {
   house_accent: houseAccentUrl,
   barracks_accent: barracksAccentUrl,
   stable_accent: stableAccentUrl,
+  blacksmith_accent: blacksmithAccentUrl,
   tower_accent: towerAccentUrl,
   storehouse_accent: storehouseAccentUrl,
   lumber_camp_accent: lumberCampAccentUrl,
