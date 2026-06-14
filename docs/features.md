@@ -548,14 +548,21 @@ add arrows, villagers pop out on command. Classic AoE raid-survival layer.
 list), [constants.ts](packages/shared/src/constants.ts),
 [Hud.tsx](packages/client/src/ui/Hud.tsx) (eject button).
 
-### 7.6 Walls → Gates, auto-connect, and tiers  — 🔨 **M**
+### 7.6 Walls → Gates, auto-connect, and tiers  — 🔨 **M** — ✅ gates + auto-connect (tiers pending 7.4)
 
-**Have today.** 1×1 `wall` with drag-to-place a line (§3.2 ✅).
-**Add.** A **gate** that only friendly units pass; auto-connecting straight/
-corner/end sprites; palisade→stone→fortified wall tiers (pairs with 7.4 stone).
-Gate pass-through is the only real sim work (per-tile owner-aware passability).
-**Files.** [PixiGame.ts](packages/client/src/game/PixiGame.ts) (sprite
-selection), [sim.ts](packages/shared/src/sim.ts) (gate passability), assets.
+**Have today.** 1×1 `wall` with drag-to-place a line (§3.2 ✅). **Gates** ✅ — a
+1×1 wall-line door, solid to enemies and neutral wildlife but passable to the
+owner's team once built (owner-aware passability threaded through pathfinding,
+steering, and collision). **Auto-connecting sprites** ✅ — each wall/gate picks
+an orientation-correct variant (post / end / straight / corner / T / cross, plus
+true 45° **diagonal** segments) from its same-owner neighbours, re-skinning as
+the line grows. Gates orient to the wall they sit in.
+**Still to add.** palisade→stone→fortified wall **tiers** — deferred to pair with
+7.4 Stone (wood-only tiers would just be hp/cost scaling).
+**Files.** [PixiGame.ts](packages/client/src/game/PixiGame.ts) (`wallVariant`
+auto-tile + reconcile branch), [sim.ts](packages/shared/src/sim.ts) (`gateOpenFor`
++ owner-aware blocker/stepOpen/collision), [constants.ts](packages/shared/src/constants.ts)
+(gate def), wall/gate SVGs, [scripts/gates.test.ts](scripts/gates.test.ts).
 
 ### 7.7 Siege expansion: mangonel & trebuchet  — 🔨 **M**
 

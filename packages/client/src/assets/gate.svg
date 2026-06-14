@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Gate: stone gatehouse pillars (W + E) that merge into a horizontal wall,
+       with a timber door across the passage. Default horizontal (E–W wall); the
+       renderer rotates 90° when the wall runs N–S. -->
+  <defs>
+    <linearGradient id="gS" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9aa0a6"/>
+      <stop offset="1" stop-color="#646a70"/>
+    </linearGradient>
+    <linearGradient id="gW" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a5e34"/>
+      <stop offset="1" stop-color="#5e3f22"/>
+    </linearGradient>
+  </defs>
+  <!-- stone pillars, reaching the E/W edges to meet the wall -->
+  <rect x="0" y="20" width="27" height="60" fill="url(#gS)"/>
+  <rect x="73" y="20" width="27" height="60" fill="url(#gS)"/>
+  <rect x="0" y="20" width="27" height="7" fill="#b5bbc1"/>
+  <rect x="73" y="20" width="27" height="7" fill="#b5bbc1"/>
+  <!-- merlon notches on the pillars -->
+  <g fill="#7c8288">
+    <rect x="2" y="14" width="9" height="8"/>
+    <rect x="16" y="14" width="9" height="8"/>
+    <rect x="75" y="14" width="9" height="8"/>
+    <rect x="89" y="14" width="9" height="8"/>
+  </g>
+  <!-- timber door across the passage -->
+  <rect x="27" y="26" width="46" height="48" rx="2" fill="url(#gW)"/>
+  <g stroke="#3e2a16" stroke-width="2" opacity="0.6">
+    <line x1="39" y1="27" x2="39" y2="73"/>
+    <line x1="50" y1="27" x2="50" y2="73"/>
+    <line x1="61" y1="27" x2="61" y2="73"/>
+  </g>
+  <!-- iron bands + centre seam -->
+  <g stroke="#2f3439" stroke-width="3" opacity="0.7">
+    <line x1="27" y1="38" x2="73" y2="38"/>
+    <line x1="27" y1="62" x2="73" y2="62"/>
+  </g>
+  <rect x="49" y="26" width="2" height="48" fill="#2f3439" opacity="0.5"/>
+</svg>

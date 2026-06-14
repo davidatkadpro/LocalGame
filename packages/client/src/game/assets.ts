@@ -11,6 +11,12 @@ import towerUrl from "../assets/tower.svg";
 import storehouseUrl from "../assets/storehouse.svg";
 import farmUrl from "../assets/farm.svg";
 import wallUrl from "../assets/wall.svg";
+import wallStraightUrl from "../assets/wall_straight.svg";
+import wallEndUrl from "../assets/wall_end.svg";
+import wallCornerUrl from "../assets/wall_corner.svg";
+import wallTeeUrl from "../assets/wall_tee.svg";
+import wallCrossUrl from "../assets/wall_cross.svg";
+import gateUrl from "../assets/gate.svg";
 import siegeWorkshopUrl from "../assets/siege_workshop.svg";
 import treeUrl from "../assets/tree.svg";
 import goldUrl from "../assets/gold.svg";
@@ -30,6 +36,7 @@ import towerAccentUrl from "../assets/tower_accent.svg";
 import storehouseAccentUrl from "../assets/storehouse_accent.svg";
 import farmAccentUrl from "../assets/farm_accent.svg";
 import wallAccentUrl from "../assets/wall_accent.svg";
+import gateAccentUrl from "../assets/gate_accent.svg";
 import siegeWorkshopAccentUrl from "../assets/siege_workshop_accent.svg";
 
 export type SpriteKey =
@@ -44,6 +51,12 @@ export type SpriteKey =
   | "storehouse"
   | "farm"
   | "wall"
+  | "wall_straight"
+  | "wall_end"
+  | "wall_corner"
+  | "wall_tee"
+  | "wall_cross"
+  | "gate"
   | "siege_workshop"
   | "tree"
   | "gold"
@@ -62,6 +75,7 @@ export type SpriteKey =
   | "storehouse_accent"
   | "farm_accent"
   | "wall_accent"
+  | "gate_accent"
   | "siege_workshop_accent";
 
 const URLS: Record<SpriteKey, string> = {
@@ -76,6 +90,12 @@ const URLS: Record<SpriteKey, string> = {
   storehouse: storehouseUrl,
   farm: farmUrl,
   wall: wallUrl,
+  wall_straight: wallStraightUrl,
+  wall_end: wallEndUrl,
+  wall_corner: wallCornerUrl,
+  wall_tee: wallTeeUrl,
+  wall_cross: wallCrossUrl,
+  gate: gateUrl,
   siege_workshop: siegeWorkshopUrl,
   tree: treeUrl,
   gold: goldUrl,
@@ -94,6 +114,7 @@ const URLS: Record<SpriteKey, string> = {
   storehouse_accent: storehouseAccentUrl,
   farm_accent: farmAccentUrl,
   wall_accent: wallAccentUrl,
+  gate_accent: gateAccentUrl,
   siege_workshop_accent: siegeWorkshopAccentUrl,
 };
 

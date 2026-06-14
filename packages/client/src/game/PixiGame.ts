@@ -12,6 +12,7 @@ import {
   minAgeOfBuilding,
   rectContains,
   type AnimalDTO,
+  type BuildingDTO,
   type BuildingType,
   type Command,
   type GameMap,
@@ -85,6 +86,9 @@ export class PixiGame {
 
   private unitSprites = new Map<number, Sprite>();
   private buildingSprites = new Map<number, Sprite>();
+  // Last auto-tile skin (variant key + rotation + scale) applied to each wall/gate
+  // sprite, so we only re-texture when its neighbours actually change.
+  private wallSkin = new Map<number, string>();
   private resourceSprites = new Map<number, Sprite>();
   // Largest amount seen per resource node, so depletion scales even for carcasses
   // (whose full size isn't a fixed constant).
@@ -522,6 +526,76 @@ export class PixiGame {
     this.ownUnitsInit = true;
   }
 
+  /** Auto-tile a wall/gate from its same-owner wall-like neighbours: returns the
+   *  variant sprite key, rotation (radians, clockwise), and scale (in tiles).
+   *  Orthogonal runs use the post/end/straight/corner/tee/cross set; a tile with
+   *  only diagonal neighbours uses a √2-scaled straight/end rotated 45° so a
+   *  diagonal staircase reads as one continuous wall. */
+  private wallVariant(b: BuildingDTO, snap: Snapshot): { key: SpriteKey; rot: number; scale: number } {
+    const H = Math.PI / 2;
+    const at = (dx: number, dy: number) =>
+      snap.buildings.some(
+        (o) =>
+          o.owner === b.owner &&
+          (o.type === "wall" || o.type === "gate") &&
+          o.tx === b.tx + dx &&
+          o.ty === b.ty + dy,
+      );
+    const N = at(0, -1);
+    const E = at(1, 0);
+    const S = at(0, 1);
+    const W = at(-1, 0);
+
+    if (b.type === "gate") {
+      const vertical = (N || S) && !(E || W);
+      return { key: "gate", rot: vertical ? H : 0, scale: 1 };
+    }
+
+    const mask = (N ? 1 : 0) | (E ? 2 : 0) | (S ? 4 : 0) | (W ? 8 : 0);
+    switch (mask) {
+      // end-caps (one side) — default stub points E
+      case 2: return { key: "wall_end", rot: 0, scale: 1 }; // E
+      case 4: return { key: "wall_end", rot: H, scale: 1 }; // S
+      case 8: return { key: "wall_end", rot: 2 * H, scale: 1 }; // W
+      case 1: return { key: "wall_end", rot: -H, scale: 1 }; // N
+      // straights (two opposite) — default E–W
+      case 10: return { key: "wall_straight", rot: 0, scale: 1 }; // E+W
+      case 5: return { key: "wall_straight", rot: H, scale: 1 }; // N+S
+      // corners (two adjacent) — default E+S
+      case 6: return { key: "wall_corner", rot: 0, scale: 1 }; // E+S
+      case 12: return { key: "wall_corner", rot: H, scale: 1 }; // S+W
+      case 9: return { key: "wall_corner", rot: 2 * H, scale: 1 }; // W+N
+      case 3: return { key: "wall_corner", rot: -H, scale: 1 }; // N+E
+      // tees (three) — default open to N (E+S+W)
+      case 14: return { key: "wall_tee", rot: 0, scale: 1 }; // no N
+      case 13: return { key: "wall_tee", rot: H, scale: 1 }; // no E
+      case 11: return { key: "wall_tee", rot: 2 * H, scale: 1 }; // no S
+      case 7: return { key: "wall_tee", rot: -H, scale: 1 }; // no W
+      // cross
+      case 15: return { key: "wall_cross", rot: 0, scale: 1 };
+    }
+
+    // No orthogonal neighbours → true diagonal segments (cosmetic; collision is
+    // still per-tile). Pure diagonal runs are the target case.
+    const NE = at(1, -1);
+    const SE = at(1, 1);
+    const SW = at(-1, 1);
+    const NW = at(-1, -1);
+    const D = Math.PI / 4;
+    const S2 = Math.SQRT2;
+    if (NE && SW && !SE && !NW) return { key: "wall_straight", rot: -D, scale: S2 }; // NE–SW
+    if (NW && SE && !NE && !SW) return { key: "wall_straight", rot: D, scale: S2 }; // NW–SE
+    const diag = (NE ? 1 : 0) + (SE ? 1 : 0) + (SW ? 1 : 0) + (NW ? 1 : 0);
+    if (diag === 1) {
+      if (NE) return { key: "wall_end", rot: -D, scale: S2 };
+      if (SE) return { key: "wall_end", rot: D, scale: S2 };
+      if (SW) return { key: "wall_end", rot: 3 * D, scale: S2 };
+      return { key: "wall_end", rot: -3 * D, scale: S2 }; // NW
+    }
+    // isolated (or an ambiguous diagonal cluster) → the standalone post
+    return { key: "wall", rot: 0, scale: 1 };
+  }
+
   private reconcileBuildings(curr: Snapshot, st: ReturnType<typeof useStore.getState>): void {
     void st;
     const seen = new Set<number>();
@@ -543,6 +617,20 @@ export class PixiGame {
       sp.alpha = 0.45 + 0.55 * b.progress;
       sp.position.set(cx, cy);
       sp.zIndex = b.ty + def.size.h; // sort by bottom edge
+
+      // Walls & gates auto-tile: pick an orientation-correct variant sprite from
+      // the same-owner wall/gate neighbours, re-skinning only when they change.
+      if (b.type === "wall" || b.type === "gate") {
+        const v = this.wallVariant(b, curr);
+        const skin = `${v.key}|${v.rot}|${v.scale}`;
+        if (this.wallSkin.get(b.id) !== skin) {
+          sp.texture = textures[v.key];
+          sp.width = v.scale;
+          sp.height = v.scale;
+          sp.rotation = v.rot;
+          this.wallSkin.set(b.id, skin);
+        }
+      }
 
       const bfx = this.buildingFx.get(b.id) ?? { hp: b.hp, flashUntil: 0 };
       if (b.hp < bfx.hp) {
@@ -576,6 +664,7 @@ export class PixiGame {
         this.buildingSprites.delete(id);
         this.buildProgress.delete(id);
         this.buildingFx.delete(id);
+        this.wallSkin.delete(id);
       }
     }
   }

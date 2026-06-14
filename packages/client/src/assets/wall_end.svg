@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Auto-tile wall: an end-cap (one connection). Default stub → E (closed at
+       the W). The renderer rotates it to N/E/S/W (and ±45°/±135° for diagonals). -->
+  <defs>
+    <linearGradient id="wS" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9aa0a6"/>
+      <stop offset="1" stop-color="#646a70"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="28" width="76" height="44" rx="8" fill="url(#wS)"/>
+  <rect x="24" y="28" width="76" height="7" rx="6" fill="#b5bbc1"/>
+  <rect x="24" y="65" width="76" height="7" fill="#000000" opacity="0.12"/>
+  <g stroke="#4c5257" stroke-width="2" opacity="0.5">
+    <line x1="24" y1="50" x2="100" y2="50"/>
+    <line x1="56" y1="35" x2="56" y2="65"/>
+    <line x1="80" y1="35" x2="80" y2="65"/>
+  </g>
+</svg>

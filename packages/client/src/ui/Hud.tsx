@@ -53,6 +53,7 @@ export const BUILDING_LABEL: Record<BuildingType, string> = {
   storehouse: "Storehouse",
   farm: "Farm",
   wall: "Wall",
+  gate: "Gate",
   siege_workshop: "Siege Workshop",
 };
 
@@ -400,7 +401,9 @@ function ControlsText() {
       <b> Ctrl+1–9</b> sets a control group, <b>1–9</b> recalls it (double-tap to centre). Select a
       building, then right-click/tap to set its rally point. Right-click/tap a <b>damaged building</b>{" "}
       with workers to repair it. <b>Shift+click</b> queues orders (move/gather/attack). Pick{" "}
-      <b>Wall</b> (with a worker selected) and drag to build a line. You start in the <b>Dark Age</b>
+      <b>Wall</b> (with a worker selected) and drag to build a line — walls auto-connect into corners
+      and junctions; drop a <b>Gate</b> into a wall to let your own units through while enemies are
+      blocked. You start in the <b>Dark Age</b>
       {" "}(economy only) — build a storehouse or farm, then <b>select your Town Center and Advance
       Age</b> to unlock barracks, military, and later siege. Arrow keys / drag to pan, wheel / pinch
       to zoom.

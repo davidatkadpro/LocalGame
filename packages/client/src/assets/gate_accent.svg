@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <!-- Team-colour accent (tinted): a small centred pip so a wall shows its
-       owner at any orientation (the base sprite rotates; this stays readable). -->
+  <!-- Team-colour accent (tinted): a banner atop each gatehouse pillar. -->
   <defs>
     <linearGradient id="acc" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#ffffff"/>
       <stop offset="1" stop-color="#cccccc"/>
     </linearGradient>
   </defs>
-  <rect x="40" y="40" width="20" height="20" rx="4" transform="rotate(45 50 50)" fill="url(#acc)"/>
+  <rect x="3" y="6" width="21" height="9" rx="2" fill="url(#acc)"/>
+  <rect x="76" y="6" width="21" height="9" rx="2" fill="url(#acc)"/>
 </svg>

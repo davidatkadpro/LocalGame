@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Auto-tile wall: a T-junction joining three sides. Default E + S + W
+       (open to the N); the renderer rotates by the missing side. -->
+  <defs>
+    <linearGradient id="wS" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9aa0a6"/>
+      <stop offset="1" stop-color="#646a70"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="28" width="100" height="44" fill="url(#wS)"/>
+  <rect x="28" y="28" width="44" height="72" fill="url(#wS)"/>
+  <rect x="0" y="28" width="100" height="7" fill="#b5bbc1"/>
+  <g stroke="#4c5257" stroke-width="2" opacity="0.45">
+    <line x1="0" y1="50" x2="100" y2="50"/>
+    <line x1="50" y1="72" x2="50" y2="100"/>
+    <line x1="25" y1="35" x2="25" y2="65"/>
+    <line x1="75" y1="35" x2="75" y2="65"/>
+  </g>
+</svg>
