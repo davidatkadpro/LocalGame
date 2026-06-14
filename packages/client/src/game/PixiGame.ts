@@ -1832,6 +1832,21 @@ export class PixiGame {
         }
       }
     }
+    // friendly completed TC/tower? -> shelter the selected units inside it. A
+    // damaged one is caught above first (workers repair under fire); everything
+    // else garrisons. Garrisoned archers add arrows; eject from the build panel.
+    for (const b of snap.buildings) {
+      const def = BUILDING_DEFS[b.type as BuildingType];
+      if (
+        b.owner === this.me() &&
+        b.progress >= 1 &&
+        (def.garrisonCap ?? 0) > 0 &&
+        rectContains(b.tx, b.ty, def.size.w, def.size.h, tx, ty)
+      ) {
+        sfx.command();
+        return this.send({ c: "garrison", units, building: b.id });
+      }
+    }
     // friendly completed farm? -> gather its hosted food node. The node sits on
     // a single tile under the 2x2 footprint (no crop sprite), so a tap anywhere
     // on the farm should assign workers — not just the exact node tile.

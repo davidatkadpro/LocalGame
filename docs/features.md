@@ -584,7 +584,7 @@ Covered by `scripts/stone.test.ts` (plumbing, tower-cost shift, camp bonus, ever
 map has stone, a worker mines+deposits it). **7.6 wall tiers** (palisade → stone →
 fortified) can now build on this as the next step.
 
-### 7.5 Town Center fires arrows + Garrison  — 🔨 **M** — ✅ TC fires arrows (garrison pending)
+### 7.5 Town Center fires arrows + Garrison  — ✅ **M**
 
 **Have today.** Towers auto-attack visible enemies in range.
 **Add.** (a) Give the **TC** the same building-weapon loop so a base bites back;
@@ -600,9 +600,15 @@ archers (5) so a lone archer can't snipe villagers under it, while massed ranged
 units still overwhelm it (one target per volley). The client arrow visual was
 generalised from towers to *any* building with an `attack` def and made
 owner-aware (an enemy TC no longer appears to fire on its own workers).
-Sim-tested in [tc_arrows.test.ts](scripts/tc_arrows.test.ts). 7.5b **garrison**
-(shelter units, garrisoned archers add arrows, villagers eject on command) is
-deferred.
+Sim-tested in [tc_arrows.test.ts](scripts/tc_arrows.test.ts). 7.5b **garrison** ✅
+— any unit shelters inside a TC (cap 10) or tower (cap 5) by right-clicking it.
+Sheltered units leave the map (protected, not targetable) but still cost pop, so
+garrison can't dodge the cap. Garrisoned **archers add arrows** to the building's
+volley (one extra shot each, spread across the nearest foes and reaching out to
+archer range), turning a manned tower into a real strongpoint. **Eject** from the
+building panel — and a razed building spills its garrison onto the rubble rather
+than swallowing it. New `garrison`/`ejectGarrison` commands + `garrisonCap` defs;
+sim-tested in [garrison.test.ts](scripts/garrison.test.ts) (21 checks).
 
 ### 7.6 Walls → Gates, auto-connect, and tiers  — 🔨 **M** — ✅ done
 

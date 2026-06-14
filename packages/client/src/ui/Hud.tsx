@@ -517,7 +517,9 @@ function ControlsText() {
       a unit to grab all of its type on screen.
       <b> Ctrl+1–9</b> sets a control group, <b>1–9</b> recalls it (double-tap to centre). Select a
       building, then right-click/tap to set its rally point. Right-click/tap a <b>damaged building</b>{" "}
-      with workers to repair it. <b>Shift+click</b> queues orders (move/gather/attack). Pick{" "}
+      with workers to repair it. Right-click/tap your <b>Town Center or tower</b> with units to{" "}
+      <b>garrison</b> them (sheltered &amp; protected; garrisoned archers add arrows) — eject from the
+      building panel. <b>Shift+click</b> queues orders (move/gather/attack). Pick{" "}
       <b>Wall</b> (with a worker selected) and drag to build a line — walls auto-connect into corners
       and junctions; drop a <b>Gate</b> into a wall to let your own units through while enemies are
       blocked. You start in the <b>Dark Age</b>
@@ -914,6 +916,22 @@ function BuildingPanel({
 
       {built && (def.canTrain.length > 0 || building.type === "barracks") && (
         <div className="small muted">Right-click / tap map to set rally.</div>
+      )}
+
+      {built && (def.garrisonCap ?? 0) > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+          <span className="small muted" title="Right-click this building with units selected to shelter them">
+            🛡 {building.garrison ?? 0}/{def.garrisonCap} sheltered
+          </span>
+          {(building.garrison ?? 0) > 0 && (
+            <button
+              onClick={() => command({ c: "ejectGarrison", building: building.id })}
+              title="Send all sheltered units back outside"
+            >
+              ⏏ Eject
+            </button>
+          )}
+        </div>
       )}
 
       <div className="demolish-row">
