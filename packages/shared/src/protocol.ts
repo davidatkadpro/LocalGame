@@ -1,6 +1,7 @@
 ﻿// Wire protocol: every message that crosses the WebSocket.
 // All messages are discriminated unions on `t`.
 
+import { BUILDING_DEFS, UNIT_DEFS, UPGRADE_DEFS } from "./constants";
 import type {
   AnimalKind,
   BuildingType,
@@ -176,6 +177,63 @@ export type Command =
   | { c: "stop"; units: number[] }
   | { c: "demolish"; building: number }
   | { c: "concede" };
+
+// ---------- Command validation (the server is the trust boundary) ----------
+// Clients are untrusted: a malformed or hostile packet must be dropped, never
+// crash the host or reach the sim with a bad shape. Validity lives next to the
+// `Command` union it guards so the two can never drift — the COMMAND_VALIDATORS
+// record below is keyed by `Command["c"]`, so adding a command variant without a
+// validator (or removing one) is a *compile error*, not a silent hole.
+
+const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+// Cap the id list so a single command can't make the sim iterate an enormous
+// array (no real selection approaches this).
+const isIdList = (v: unknown): boolean => Array.isArray(v) && v.length <= 1000 && v.every(isNum);
+const isTile = (v: unknown): boolean =>
+  !!v && typeof v === "object" && isNum((v as { x: unknown }).x) && isNum((v as { y: unknown }).y);
+
+type CmdFields = Record<string, unknown>;
+
+// One validator per Command variant. The `Record<Command["c"], …>` type makes the
+// set of keys exhaustive: a new variant must add a case here or the file won't
+// compile, so the trust boundary can never fall behind the protocol.
+const COMMAND_VALIDATORS: Record<Command["c"], (c: CmdFields) => boolean> = {
+  move: (c) => isIdList(c.units) && isTile(c.tile),
+  attackMove: (c) => isIdList(c.units) && isTile(c.tile),
+  patrol: (c) => isIdList(c.units) && isTile(c.tile),
+  gather: (c) => isIdList(c.units) && isNum(c.node),
+  build: (c) =>
+    isNum(c.unit) && isTile(c.tile) && typeof c.building === "string" && c.building in BUILDING_DEFS,
+  construct: (c) => isIdList(c.units) && isNum(c.building),
+  train: (c) => isNum(c.building) && typeof c.unit === "string" && c.unit in UNIT_DEFS,
+  cancelTrain: (c) => isNum(c.building),
+  advanceAge: (c) => isNum(c.building),
+  demolish: (c) => isNum(c.building),
+  research: (c) =>
+    isNum(c.building) && typeof c.upgrade === "string" && c.upgrade in UPGRADE_DEFS,
+  rally: (c) => isNum(c.building) && isTile(c.tile),
+  attack: (c) => isIdList(c.units) && isNum(c.target),
+  setStance: (c) =>
+    isIdList(c.units) &&
+    (c.stance === "aggressive" ||
+      c.stance === "defensive" ||
+      c.stance === "standGround" ||
+      c.stance === "noAttack"),
+  garrison: (c) => isIdList(c.units) && isNum(c.building),
+  ejectGarrison: (c) => isNum(c.building),
+  stop: (c) => isIdList(c.units),
+  concede: () => true,
+};
+
+/** Validate a client Command's shape — including that building/unit/upgrade names
+ *  are real keys — so applyCommand never dereferences an unknown def or iterates
+ *  a non-array. Runs at the server boundary before anything touches the world. */
+export function validateCommand(cmd: unknown): cmd is Command {
+  if (!cmd || typeof cmd !== "object") return false;
+  const c = cmd as CmdFields;
+  const validate = COMMAND_VALIDATORS[c.c as Command["c"]];
+  return validate !== undefined && validate(c);
+}
 
 // ---------- Client -> Server ----------
 
