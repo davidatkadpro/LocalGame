@@ -2,16 +2,20 @@
 // For LAN play we host exactly one room (one game at a time).
 
 import {
+  BUILDING_DEFS,
   MAX_PLAYERS,
   MIN_PLAYERS,
   PLAYER_COLORS,
   TICK_MS,
+  UNIT_DEFS,
+  UPGRADE_DEFS,
   applyCommand,
   createFog,
   createWorld,
   tick,
   viewFor,
   type ClientMessage,
+  type Command,
   type Fog,
   type GameMode,
   type LeaderboardEntry,
@@ -41,6 +45,65 @@ interface Slot {
 }
 
 type Phase = "lobby" | "playing" | "over";
+
+// ---- client-input validation (the server is the trust boundary) ----
+// Clients are untrusted: a malformed or hostile packet must be dropped, never
+// crash the host or reach the sim with a bad shape. These run before anything is
+// applied to the authoritative world.
+const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+// Cap the id list so a single command can't make the sim iterate an enormous
+// array (no real selection approaches this).
+const isIdList = (v: unknown): boolean => Array.isArray(v) && v.length <= 1000 && v.every(isNum);
+const isTile = (v: unknown): boolean =>
+  !!v && typeof v === "object" && isNum((v as { x: unknown }).x) && isNum((v as { y: unknown }).y);
+
+/** Validate a client Command's shape — including that building/unit/upgrade names
+ *  are real keys — so applyCommand never dereferences an unknown def or iterates
+ *  a non-array. */
+function isValidCommand(cmd: unknown): cmd is Command {
+  if (!cmd || typeof cmd !== "object") return false;
+  const c = cmd as Record<string, unknown>;
+  switch (c.c) {
+    case "move":
+    case "attackMove":
+    case "patrol":
+      return isIdList(c.units) && isTile(c.tile);
+    case "gather":
+      return isIdList(c.units) && isNum(c.node);
+    case "build":
+      return (
+        isNum(c.unit) && isTile(c.tile) && typeof c.building === "string" && c.building in BUILDING_DEFS
+      );
+    case "construct":
+      return isIdList(c.units) && isNum(c.building);
+    case "train":
+      return isNum(c.building) && typeof c.unit === "string" && c.unit in UNIT_DEFS;
+    case "cancelTrain":
+    case "advanceAge":
+    case "demolish":
+      return isNum(c.building);
+    case "research":
+      return isNum(c.building) && typeof c.upgrade === "string" && c.upgrade in UPGRADE_DEFS;
+    case "rally":
+      return isNum(c.building) && isTile(c.tile);
+    case "attack":
+      return isIdList(c.units) && isNum(c.target);
+    case "setStance":
+      return (
+        isIdList(c.units) &&
+        (c.stance === "aggressive" ||
+          c.stance === "defensive" ||
+          c.stance === "standGround" ||
+          c.stance === "noAttack")
+      );
+    case "stop":
+      return isIdList(c.units);
+    case "concede":
+      return true;
+    default:
+      return false;
+  }
+}
 
 export class GameRoom {
   private slots = new Map<number, Slot>(); // playerId -> slot
@@ -112,26 +175,40 @@ export class GameRoom {
   }
 
   onMessage(conn: Conn, msg: ClientMessage): void {
+    if (!msg || typeof msg !== "object") return;
     switch (msg.t) {
       case "join":
-        this.handleJoin(conn, msg.name, msg.clientId);
+        // name/clientId arrive from JSON; only accept strings (handleJoin slices
+        // the name, which would throw on a number/object).
+        if (typeof msg.name === "string") {
+          this.handleJoin(conn, msg.name, typeof msg.clientId === "string" ? msg.clientId : undefined);
+        }
         break;
       case "setColor":
-        this.withSlot(conn, (slot) => {
-          if (this.colorTaken(msg.color, conn.playerId!)) return;
-          slot.color = msg.color;
-          this.broadcastLobby();
-        });
+        // Only a real palette colour — a client can't inject an arbitrary string.
+        if (typeof msg.color === "string" && PLAYER_COLORS.includes(msg.color)) {
+          this.withSlot(conn, (slot) => {
+            if (this.colorTaken(msg.color, conn.playerId!)) return;
+            slot.color = msg.color;
+            this.broadcastLobby();
+          });
+        }
         break;
       case "setReady":
-        this.withSlot(conn, (slot) => {
-          slot.ready = msg.ready;
-          this.broadcastLobby();
-        });
+        if (typeof msg.ready === "boolean") {
+          this.withSlot(conn, (slot) => {
+            slot.ready = msg.ready;
+            this.broadcastLobby();
+          });
+        }
         break;
       case "setMode":
         // Host only. Switching to 2v2 seeds default teams; FFA gives each its own.
-        if (conn.playerId === this.hostPlayerId && this.phase === "lobby") {
+        if (
+          (msg.mode === "ffa" || msg.mode === "2v2") &&
+          conn.playerId === this.hostPlayerId &&
+          this.phase === "lobby"
+        ) {
           this.mode = msg.mode;
           this.assignDefaultTeams();
           this.broadcastLobby();
@@ -139,7 +216,7 @@ export class GameRoom {
         break;
       case "setTeam":
         // Host only: assign a player to team 0 or 1 (2v2).
-        if (conn.playerId === this.hostPlayerId && this.phase === "lobby") {
+        if (conn.playerId === this.hostPlayerId && this.phase === "lobby" && isNum(msg.target)) {
           const slot = this.slots.get(msg.target);
           if (slot && (msg.team === 0 || msg.team === 1)) {
             slot.team = msg.team;
@@ -152,13 +229,24 @@ export class GameRoom {
         break;
       case "setPaused":
         // Host freezes/unfreezes a running match (e.g. someone stepped away).
-        if (conn.playerId === this.hostPlayerId && this.phase === "playing") {
+        if (
+          typeof msg.paused === "boolean" &&
+          conn.playerId === this.hostPlayerId &&
+          this.phase === "playing"
+        ) {
           this.setPaused(msg.paused);
         }
         break;
       case "command":
-        // Commands are dropped while paused so the freeze is a true stop.
-        if (this.phase === "playing" && !this.paused && this.world && conn.playerId !== null) {
+        // Commands are dropped while paused so the freeze is a true stop, and the
+        // shape is validated first so a malformed packet can't crash the sim.
+        if (
+          this.phase === "playing" &&
+          !this.paused &&
+          this.world &&
+          conn.playerId !== null &&
+          isValidCommand(msg.cmd)
+        ) {
           applyCommand(this.world, conn.playerId, msg.cmd);
         }
         break;
