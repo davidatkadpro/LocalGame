@@ -639,13 +639,17 @@ them on the field. Client-only.
 **Status.** Amber pulsing ring on my idle workers (hidden when selected) + red
 ring on any unit under 34% HP, drawn in the existing selection pass.
 
-### 8.3 Income rate + villager allocation readout  — 🔨 **S–M**
+### 8.3 Income rate + villager allocation readout  — 🔨 **S–M** — ✅ done
 
 No per-second income exists anywhere. Add a compact "🪵+12/s · 🍖+8/s · 🪙+4/s"
 line and/or a villager-allocation count ("6 wood · 3 food · 2 gold · 2 idle").
 Turns the eco game from guesswork into management.
 **Files.** [store.ts](packages/client/src/net/store.ts) (derived tally),
 [Hud.tsx](packages/client/src/ui/Hud.tsx).
+**Status.** Top bar now shows a green **+N/s** gather rate beside each resource,
+smoothed (EMA, ~2.5s) from positive snapshot deltas so spending doesn't drag it
+negative — fully client-derived, no protocol change. Added a **👷 workers
+(idle)** tile. Income resets on each new match.
 
 ### 8.4 Sub-select & cancel from the panels  — 🔨 **S** — ✅ done
 

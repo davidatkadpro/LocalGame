@@ -62,6 +62,7 @@ export function Hud({
   onToggleMinimap,
 }: HudProps) {
   const snap = useStore((s) => s.curr);
+  const income = useStore((s) => s.income);
   const selectedUnits = useStore((s) => s.selectedUnits);
   const selectedBuilding = useStore((s) => s.selectedBuilding);
   const selectArmed = useStore((s) => s.selectArmed);
@@ -82,6 +83,9 @@ export function Hud({
   const upgrades = snap?.me.upgrades ?? [];
 
   const me = snap?.me.playerId;
+  const myWorkers = snap
+    ? snap.units.filter((u) => u.owner === me && u.type === "worker").length
+    : 0;
   const idleWorkers = snap
     ? snap.units.filter((u) => u.owner === me && u.type === "worker" && u.state === "idle").length
     : 0;
@@ -98,9 +102,14 @@ export function Hud({
   return (
     <>
       <div className="hud-top">
-        <Res icon="🪵" label="Wood" value={res.wood} />
-        <Res icon="🍖" label="Food" value={res.food} />
-        <Res icon="🪙" label="Gold" value={res.gold} />
+        <Res icon="🪵" label="Wood" value={res.wood} rate={income.wood} />
+        <Res icon="🍖" label="Food" value={res.food} rate={income.food} />
+        <Res icon="🪙" label="Gold" value={res.gold} rate={income.gold} />
+        <Res
+          icon="👷"
+          label="Workers"
+          value={idleWorkers > 0 ? `${myWorkers} (${idleWorkers}💤)` : `${myWorkers}`}
+        />
         <Res
           icon="👥"
           label="Pop"
@@ -678,16 +687,23 @@ function Res({
   label,
   value,
   warn,
+  rate,
 }: {
   icon: string;
   label: string;
   value: number | string;
   warn?: boolean;
+  rate?: number;
 }) {
   return (
     <div className={`res ${warn ? "res-warn" : ""}`} title={warn ? "Population capped — build houses" : label}>
       <span>{icon}</span>
       <strong>{typeof value === "number" ? Math.floor(value) : value}</strong>
+      {rate !== undefined && rate >= 0.5 && (
+        <span className="res-rate" title={`${label} gathered per second`}>
+          +{rate.toFixed(0)}/s
+        </span>
+      )}
     </div>
   );
 }

@@ -280,6 +280,13 @@ button.primary:hover:not(:disabled) {
   gap: 6px;
   font-size: 15px;
 }
+/* per-second gather rate next to a resource total */
+.res-rate {
+  color: #69db7c;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.9;
+}
 /* Population at the cap: warn the player so it's obvious why units won't train. */
 .res-warn {
   color: #ffa94d;
