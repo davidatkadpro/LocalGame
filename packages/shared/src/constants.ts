@@ -13,6 +13,12 @@ export const TICK_HZ = 10;
 export const TICK_MS = 1000 / TICK_HZ;
 export const TICK_DT = TICK_MS / 1000; // seconds per tick
 
+// Soft-body radius of a unit; the collision pass keeps unit centres at least
+// UNIT_SEPARATION apart. A melee unit's attack `range` must exceed this gap or it
+// could never close to striking distance (see the worker def below).
+export const UNIT_RADIUS = 0.32;
+export const UNIT_SEPARATION = UNIT_RADIUS * 2; // 0.64 — min gap between centres
+
 // ---- Lobby / players ----
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 4;
@@ -68,7 +74,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     popCost: 1,
     trainMs: 5000,
     damage: 3,
-    range: 0.75, // must exceed unit separation (0.64) so melee can connect
+    range: 0.75, // must exceed UNIT_SEPARATION (0.64) so melee can connect
     attackMs: 1200,
     trainedAt: "town_center",
   },

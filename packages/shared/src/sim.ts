@@ -15,6 +15,7 @@ import {
   TICK_DT,
   WONDER_COUNTDOWN_MS,
   UNIT_DEFS,
+  UNIT_SEPARATION,
   UPGRADE_DEFS,
   campBonusFor,
   canAfford,
@@ -1234,7 +1235,7 @@ function stepOpen(world: World, x: number, y: number, mover?: PlayerId): boolean
  * sides, so they pass each other instead of bouncing back along their approach.
  */
 function avoidanceSteer(world: World, u: Unit, hx: number, hy: number): { x: number; y: number } {
-  const minSep = UNIT_RADIUS * 2;
+  const minSep = UNIT_SEPARATION;
   let bestProj = Infinity;
   let bestPerp = 0;
   let found = false;
@@ -1264,15 +1265,13 @@ function avoidanceSteer(world: World, u: Unit, hx: number, hy: number): { x: num
   return { x: lx * s, y: ly * s };
 }
 
-const UNIT_RADIUS = 0.32; // min separation between unit centres = 2 * radius
-
 /**
  * Soft separation so units don't stack on the same point. Uses a per-tile
  * spatial hash and pushes overlapping pairs apart, never into walls/buildings.
  * Deterministic (no RNG) so the authoritative sim stays reproducible.
  */
 function resolveCollisions(world: World): void {
-  const minSep = UNIT_RADIUS * 2;
+  const minSep = UNIT_SEPARATION;
   const w = world.map.width;
   // Owner-aware: a unit is never pushed off its own (friendly) gate tile, and
   // enemies can't be shoved through one.
