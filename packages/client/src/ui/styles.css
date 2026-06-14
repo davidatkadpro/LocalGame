@@ -280,6 +280,25 @@ button.primary:hover:not(:disabled) {
   gap: 6px;
   font-size: 15px;
 }
+/* Population at the cap: warn the player so it's obvious why units won't train. */
+.res-warn {
+  color: #ffa94d;
+}
+.res-warn strong {
+  text-shadow: 0 0 6px rgba(255, 169, 77, 0.6);
+}
+.pop-hint {
+  align-self: center;
+  color: #ffa94d;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  animation: pop-hint-pulse 1.6s ease-in-out infinite;
+}
+@keyframes pop-hint-pulse {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
+}
 
 .hud-bottom {
   position: absolute;

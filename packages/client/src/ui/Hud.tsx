@@ -14,6 +14,7 @@ import { isMuted, toggleMuted } from "../game/audio";
 interface HudProps {
   onPlace: (b: BuildingType) => void;
   onAttackMove: () => void;
+  onStop: () => void;
   onIdleWorker: () => void;
   onSelectMode: () => void;
   onSelectIds: (ids: number[]) => void;
@@ -52,6 +53,7 @@ type MobileTab = "build" | "commands" | "selection" | "controls";
 export function Hud({
   onPlace,
   onAttackMove,
+  onStop,
   onIdleWorker,
   onSelectMode,
   onSelectIds,
@@ -99,7 +101,17 @@ export function Hud({
         <Res icon="🪵" label="Wood" value={res.wood} />
         <Res icon="🍖" label="Food" value={res.food} />
         <Res icon="🪙" label="Gold" value={res.gold} />
-        <Res icon="👥" label="Pop" value={`${pop}/${popCap}`} />
+        <Res
+          icon="👥"
+          label="Pop"
+          value={`${pop}/${popCap}`}
+          warn={popCap > 0 && pop >= popCap}
+        />
+        {popCap > 0 && pop >= popCap && (
+          <span className="pop-hint" title="Population capped">
+            🏠 Build houses
+          </span>
+        )}
         {upgrades.length > 0 && (
           <span className="upgrades" title="Researched upgrades">
             {upgrades.map((u) => (
@@ -122,6 +134,7 @@ export function Hud({
         <MobileBottom
           onPlace={onPlace}
           onAttackMove={onAttackMove}
+          onStop={onStop}
           onIdleWorker={onIdleWorker}
           onSelectMode={onSelectMode}
           selectArmed={selectArmed}
@@ -143,6 +156,7 @@ export function Hud({
             selectArmed={selectArmed}
             onSelectMode={onSelectMode}
             onAttackMove={onAttackMove}
+            onStop={onStop}
             selectedCount={selectedUnits.length}
             onIdleWorker={onIdleWorker}
             idleWorkers={idleWorkers}
@@ -203,6 +217,7 @@ function CommandsPanelView({
   selectArmed,
   onSelectMode,
   onAttackMove,
+  onStop,
   selectedCount,
   onIdleWorker,
   idleWorkers,
@@ -211,6 +226,7 @@ function CommandsPanelView({
   selectArmed: boolean;
   onSelectMode: () => void;
   onAttackMove: () => void;
+  onStop: () => void;
   selectedCount: number;
   onIdleWorker: () => void;
   idleWorkers: number;
@@ -228,6 +244,9 @@ function CommandsPanelView({
       </button>
       <button onClick={onAttackMove} disabled={selectedCount === 0}>
         ⚔ Attack-move <span className="muted small">(A)</span>
+      </button>
+      <button onClick={onStop} disabled={selectedCount === 0}>
+        ✋ Stop <span className="muted small">(S)</span>
       </button>
       <button onClick={onIdleWorker} disabled={idleWorkers === 0}>
         💤 Idle worker{idleWorkers > 0 ? ` (${idleWorkers})` : ""}{" "}
@@ -314,7 +333,8 @@ function ControlsText() {
     <div className="small muted">
       Drag-select / click your units. Right-click (or tap) to move, gather, or attack. With a worker
       selected, right-click/tap a <b>sheep or cow</b> to hunt it for food. Press{" "}
-      <b>A</b> then click for attack-move; <b>.</b> cycles idle workers.
+      <b>A</b> then click for attack-move; <b>S</b> stops; <b>H</b> jumps to your town center;{" "}
+      <b>.</b> cycles idle workers. Double-click a unit to grab all of its type on screen.
       <b> Ctrl+1–9</b> sets a control group, <b>1–9</b> recalls it (double-tap to centre). Select a
       building, then right-click/tap to set its rally point. Right-click/tap a <b>damaged building</b>{" "}
       with workers to repair it. <b>Shift+click</b> queues orders (move/gather/attack). Pick{" "}
@@ -370,6 +390,7 @@ function ControlsPanelView({
 function MobileBottom({
   onPlace,
   onAttackMove,
+  onStop,
   onIdleWorker,
   onSelectMode,
   selectArmed,
@@ -386,6 +407,7 @@ function MobileBottom({
 }: {
   onPlace: (b: BuildingType) => void;
   onAttackMove: () => void;
+  onStop: () => void;
   onIdleWorker: () => void;
   onSelectMode: () => void;
   selectArmed: boolean;
@@ -430,6 +452,7 @@ function MobileBottom({
               selectArmed={selectArmed}
               onSelectMode={onSelectMode}
               onAttackMove={onAttackMove}
+              onStop={onStop}
               selectedCount={selectedCount}
               onIdleWorker={onIdleWorker}
               idleWorkers={idleWorkers}
@@ -644,9 +667,19 @@ function BuildingPanel({
   );
 }
 
-function Res({ icon, label, value }: { icon: string; label: string; value: number | string }) {
+function Res({
+  icon,
+  label,
+  value,
+  warn,
+}: {
+  icon: string;
+  label: string;
+  value: number | string;
+  warn?: boolean;
+}) {
   return (
-    <div className="res" title={label}>
+    <div className={`res ${warn ? "res-warn" : ""}`} title={warn ? "Population capped — build houses" : label}>
       <span>{icon}</span>
       <strong>{typeof value === "number" ? Math.floor(value) : value}</strong>
     </div>

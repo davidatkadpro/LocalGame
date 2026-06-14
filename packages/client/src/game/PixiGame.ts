@@ -884,6 +884,12 @@ export class PixiGame {
     if (k === "a") {
       this.armAttackMove();
       e.preventDefault();
+    } else if (k === "s") {
+      this.stopSelected();
+      e.preventDefault();
+    } else if (k === "h") {
+      this.centerOnTownCenter();
+      e.preventDefault();
     } else if (k === ".") {
       this.selectNextIdleWorker();
       e.preventDefault();
@@ -892,6 +898,24 @@ export class PixiGame {
       this.placing = null;
       this.wallDragStart = null;
       this.selectSingle(null, null);
+    }
+  }
+
+  /** Halt the current unit selection in place (cancels move/gather/attack). */
+  stopSelected(): void {
+    if (this.selected.size === 0) return;
+    this.send({ c: "stop", units: [...this.selected] });
+    sfx.command();
+  }
+
+  /** Snap the camera back to this player's town center. */
+  private centerOnTownCenter(): void {
+    const snap = useStore.getState().curr;
+    if (!snap) return;
+    const tc = snap.buildings.find((b) => b.owner === this.me() && b.type === "town_center");
+    if (tc) {
+      this.cam.x = tc.tx + 1.5;
+      this.cam.y = tc.ty + 1.5;
     }
   }
 
@@ -1226,6 +1250,17 @@ export class PixiGame {
 
   private singleSelect(wp: { x: number; y: number }): void {
     const unit = this.ownUnitAt(wp);
+    if (unit !== null) {
+      // Double-click a unit -> select every unit of that type on screen (the
+      // desktop analog of the touch double-tap).
+      const now = performance.now();
+      if (this.lastUnitTap.id === unit && now - this.lastUnitTap.t < 350) {
+        this.lastUnitTap = { id: -1, t: 0 };
+        this.selectAllOfTypeOnScreen(unit);
+        return;
+      }
+      this.lastUnitTap = { id: unit, t: now };
+    }
     const building = unit === null ? this.ownBuildingAt(wp) : null;
     this.selectSingle(unit, building);
   }

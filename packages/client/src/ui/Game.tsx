@@ -26,6 +26,7 @@ export function Game() {
 
   const onPlace = (b: BuildingType) => gameRef.current?.setPlacing(b);
   const onAttackMove = () => gameRef.current?.armAttackMove();
+  const onStop = () => gameRef.current?.stopSelected();
   const onIdleWorker = () => gameRef.current?.selectNextIdleWorker();
   const onSelectMode = () => gameRef.current?.armSelectMode();
   const onSelectIds = (ids: number[]) => gameRef.current?.setSelectionIds(ids);
@@ -39,6 +40,7 @@ export function Game() {
       <Hud
         onPlace={onPlace}
         onAttackMove={onAttackMove}
+        onStop={onStop}
         onIdleWorker={onIdleWorker}
         onSelectMode={onSelectMode}
         onSelectIds={onSelectIds}
