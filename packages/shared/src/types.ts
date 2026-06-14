@@ -190,6 +190,10 @@ export interface Building {
    *  complete (undefined for non-wonders / still building). Reaches 0 → the
    *  owner's team wins; destroying the wonder removes it and cancels the clock. */
   wonderTimer?: number;
+  /** §7.5b units sheltered inside this building (TC/tower). Garrisoned units are
+   *  off the map — protected, not rendered, not targetable — until ejected, and
+   *  garrisoned archers add arrows to the building's volley. */
+  garrison?: Unit[];
 }
 
 export interface Player {

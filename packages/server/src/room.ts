@@ -96,6 +96,10 @@ function isValidCommand(cmd: unknown): cmd is Command {
           c.stance === "standGround" ||
           c.stance === "noAttack")
       );
+    case "garrison":
+      return isIdList(c.units) && isNum(c.building);
+    case "ejectGarrison":
+      return isNum(c.building);
     case "stop":
       return isIdList(c.units);
     case "concede":

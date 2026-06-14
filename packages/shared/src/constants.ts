@@ -180,6 +180,8 @@ export interface BuildingDef {
   canTrain: UnitType[];
   /** auto-attack stats for defensive buildings (towers) */
   attack?: { damage: number; range: number; attackMs: number };
+  /** §7.5b how many units may shelter inside (TC/tower); absent = can't garrison */
+  garrisonCap?: number;
   /** upgrades that can be researched here */
   research?: UpgradeId[];
   /** renewable food source: hosts a regenerating food node workers harvest */
@@ -205,6 +207,7 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     // vs early raids. Out-ranges archers (6 vs 5) so a lone archer can't snipe
     // villagers under it; massed ranged units still overwhelm it. Tunable.
     attack: { damage: 6, range: 6, attackMs: 1000 },
+    garrisonCap: 10, // shelter a town's worth of villagers from a raid
     research: ["improvedTools", "fineTools", "masterTools"],
     buildable: false,
   },
@@ -281,6 +284,7 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     // Nerf: was 16 dmg / range 6 / 800ms (out-ranged archers and out-DPS'd
     // soldiers). Now trades evenly with massed ranged units.
     attack: { damage: 10, range: 5, attackMs: 1000 },
+    garrisonCap: 5, // a forward tower garrison adds bite
     buildable: true,
     minAge: 1, // Feudal
   },

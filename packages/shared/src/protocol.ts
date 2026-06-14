@@ -80,6 +80,8 @@ export interface BuildingDTO {
   research?: UpgradeId | null; // upgrade in progress here
   researchTimer?: number; // ms left on the current research
   researchMs?: number; // total research time (for a progress bar)
+  /** §7.5b count of units sheltered inside (own buildings only) */
+  garrison?: number;
 }
 
 export interface ResourceNodeDTO {
@@ -169,6 +171,8 @@ export type Command =
   | { c: "attackMove"; units: number[]; tile: Vec2; queue?: boolean }
   | { c: "patrol"; units: number[]; tile: Vec2 }
   | { c: "setStance"; units: number[]; stance: Stance }
+  | { c: "garrison"; units: number[]; building: number }
+  | { c: "ejectGarrison"; building: number }
   | { c: "stop"; units: number[] }
   | { c: "demolish"; building: number }
   | { c: "concede" };

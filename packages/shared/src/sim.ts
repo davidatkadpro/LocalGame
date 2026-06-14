@@ -549,6 +549,33 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
       }
       break;
     }
+    case "garrison": {
+      // Send the selected units into a friendly, completed, garrison-capable
+      // building; they walk to it and slip inside on arrival (see processGarrison).
+      const b = buildingById(world, cmd.building);
+      if (!b || b.owner !== playerId || b.progress < 1) break;
+      if ((BUILDING_DEFS[b.type].garrisonCap ?? 0) <= 0) break;
+      for (const id of cmd.units) {
+        const u = unitById(world, id);
+        if (!u || u.owner !== playerId) continue;
+        u.orders = [];
+        u.state = "moving";
+        u.targetEntity = b.id;
+        u.targetTile = null;
+        u.aggro = null;
+        u.attackedBy = null;
+        u.retaliating = false;
+        u.patrol = null;
+        u.path = pathToBuilding(world, u, b);
+      }
+      break;
+    }
+    case "ejectGarrison": {
+      const b = buildingById(world, cmd.building);
+      if (!b || b.owner !== playerId) break;
+      ejectGarrison(world, b);
+      break;
+    }
     case "demolish": {
       const b = buildingById(world, cmd.building);
       if (!b || b.owner !== playerId) break;
@@ -829,6 +856,7 @@ export function tick(world: World, fog: Fog): void {
   world.tick++;
 
   for (const u of world.units) updateUnit(world, u);
+  processGarrison(world); // units that reached a friendly TC/tower move inside
   for (const a of world.animals) updateAnimal(world, a);
   resolveCollisions(world);
 
@@ -913,6 +941,9 @@ export function tick(world: World, fog: Fog): void {
   world.resourceNodes = world.resourceNodes.filter(
     (n) => (n.amount > 0 || n.owner !== undefined) && !orphanedFarmNodes.has(n.id),
   );
+  // §7.5b a falling building spills its garrison onto the rubble — they may die
+  // to whatever razed it, but they get a chance to flee rather than vanish.
+  for (const b of world.buildings) if (b.hp <= 0) ejectGarrison(world, b);
   world.buildings = world.buildings.filter((b) => b.hp > 0);
 
   recomputePop(world);
@@ -990,21 +1021,91 @@ function tickTowers(world: World): void {
     if (!def.attack || b.progress < 1) continue;
     if (b.attackCooldown > 0) b.attackCooldown -= TICK_DT * 1000;
     if (b.attackCooldown > 0) continue;
-    let target: Unit | null = null;
-    let bestD = def.attack.range;
-    for (const u of world.units) {
-      if (sameTeam(world, u.owner, b.owner) || u.hp <= 0) continue;
-      const d = distToBuilding(u.pos, b);
-      if (d < bestD) {
-        bestD = d;
-        target = u;
-      }
+    // §7.5b garrisoned archers add arrows: the volley is the building's own shot
+    // plus one per sheltered archer, spread across the nearest foes (so it also
+    // peels a crowd). Range extends to the archers' reach when they out-range the
+    // building; with no garrison this is exactly the old single-shot behaviour.
+    const archers = (b.garrison ?? []).filter((g) => g.type === "archer").length;
+    const range = archers > 0 ? Math.max(def.attack.range, UNIT_DEFS.archer.range) : def.attack.range;
+    const foes = world.units
+      .filter((u) => !sameTeam(world, u.owner, b.owner) && u.hp > 0)
+      .map((u) => ({ u, d: distToBuilding(u.pos, b) }))
+      .filter((x) => x.d < range)
+      .sort((a, c) => a.d - c.d);
+    if (foes.length === 0) continue;
+    for (let i = 0; i < 1 + archers; i++) {
+      const t = foes[i % foes.length].u;
+      const dmg = i === 0 ? def.attack.damage : UNIT_DEFS.archer.damage;
+      t.hp -= incomingDamage(world.players[t.owner], t.type, dmg);
     }
-    if (target) {
-      target.hp -= incomingDamage(world.players[target.owner], target.type, def.attack.damage);
-      b.attackCooldown = def.attack.attackMs;
-    }
+    b.attackCooldown = def.attack.attackMs;
   }
+}
+
+/**
+ * §7.5b Garrison entry. A unit ordered to shelter has its `targetEntity` set to
+ * the building; once it reaches the footprint it is moved *out* of world.units
+ * and into the building's garrison list (protected, off the map). Runs as a pass
+ * after the unit loop so world.units isn't mutated mid-iteration.
+ */
+function processGarrison(world: World): void {
+  const entered = new Set<Unit>();
+  for (const u of world.units) {
+    if (u.targetEntity === null) continue;
+    // Only a unit travelling-to or idling-at its target (not gathering/building/
+    // attacking) is a garrison candidate — this is what distinguishes it from a
+    // worker repairing the same building.
+    if (u.state !== "moving" && u.state !== "idle") continue;
+    const b = buildingById(world, u.targetEntity);
+    if (!b || b.owner !== u.owner || b.progress < 1) continue;
+    const cap = BUILDING_DEFS[b.type].garrisonCap ?? 0;
+    if (cap <= 0) continue;
+    if (distToBuilding(u.pos, b) > REACH_DIST + 0.6) {
+      if (u.state === "idle") u.targetEntity = null; // arrived short / gave up
+      continue;
+    }
+    if ((b.garrison?.length ?? 0) >= cap) {
+      u.targetEntity = null; // building full — give up rather than loiter outside
+      continue;
+    }
+    u.targetEntity = null;
+    u.state = "idle";
+    u.path = [];
+    u.targetTile = null;
+    u.aggro = null;
+    u.attackedBy = null;
+    u.retaliating = false;
+    u.patrol = null;
+    (b.garrison ??= []).push(u);
+    entered.add(u);
+  }
+  if (entered.size > 0) world.units = world.units.filter((u) => !entered.has(u));
+}
+
+/** §7.5b Eject every garrisoned unit onto walkable ground just outside the
+ *  footprint — on the player's command, or when the building is destroyed. */
+function ejectGarrison(world: World, b: Building): void {
+  const garrison = b.garrison;
+  if (!garrison || garrison.length === 0) return;
+  const d = BUILDING_DEFS[b.type].size;
+  const from = { x: b.tile.x + d.w / 2, y: b.tile.y + d.h / 2 };
+  for (const u of garrison) {
+    const spot = approachTile(world, b, from) ?? buildingCenter(b);
+    u.pos = { x: spot.x, y: spot.y };
+    u.state = "idle";
+    u.path = [];
+    u.targetEntity = null;
+    u.targetTile = null;
+    u.aggro = null;
+    u.attackedBy = null;
+    u.retaliating = false;
+    u.patrol = null;
+    u.attackCooldown = 0;
+    u.stuck = 0;
+    u.repaths = 0;
+    world.units.push(u);
+  }
+  b.garrison = [];
 }
 
 const STUCK_LIMIT = 8; // ticks (~0.8s) of no progress before we re-path
@@ -1755,6 +1856,9 @@ function recomputePop(world: World): void {
     const ageBonus = AGE_POP_BONUS[p.age] ?? 0;
     let cap = BASE_POP_CAP + ageBonus;
     for (const u of world.units) if (u.owner === p.id) p.pop += UNIT_DEFS[u.type].popCost;
+    // Sheltered (garrisoned) units still cost pop against their own owner.
+    for (const b of world.buildings)
+      for (const gu of b.garrison ?? []) if (gu.owner === p.id) p.pop += UNIT_DEFS[gu.type].popCost;
     for (const b of world.buildings) {
       if (b.owner === p.id && b.progress >= 1) cap += BUILDING_DEFS[b.type].providesPop;
     }
@@ -1983,6 +2087,7 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
         dto.research = b.research;
         dto.researchTimer = b.researchTimer;
         dto.researchMs = b.research ? UPGRADE_DEFS[b.research].researchMs : 0;
+        if (b.garrison && b.garrison.length > 0) dto.garrison = b.garrison.length;
       }
       return dto;
     });
