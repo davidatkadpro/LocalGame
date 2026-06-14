@@ -17,6 +17,7 @@ export type BuildingType =
   | "storehouse"
   | "farm"
   | "wall"
+  | "gate"
   | "siege_workshop";
 
 /** Player-wide researches that modify effective stats. */

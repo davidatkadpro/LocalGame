@@ -224,6 +224,22 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     canTrain: [],
     buildable: true,
   },
+  gate: {
+    type: "gate",
+    // A wall-line door: sturdier than a wall, and passable to its owner's team
+    // (handled in the sim) while staying solid to enemies. Built singly into a
+    // gap in a wall run.
+    hp: 300,
+    sight: 1,
+    size: { w: 1, h: 1 },
+    cost: { wood: 30 },
+    buildMs: 6000,
+    providesPop: 0,
+    isDropOff: false,
+    canTrain: [],
+    buildable: true,
+    minAge: 0, // Dark Age, same as walls
+  },
   siege_workshop: {
     type: "siege_workshop",
     hp: 500,

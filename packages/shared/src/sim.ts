@@ -210,15 +210,36 @@ function distToBuilding(pos: Vec2, b: Building): number {
   return dist(pos, { x: cx, y: cy });
 }
 
-function buildingBlocker(world: World, ignore?: EntityId) {
+/** True if a *built* gate at this tile is open to `mover` — its owner is on the
+ *  same team. Such a gate is solid to everyone else (and to neutral wildlife,
+ *  which passes no mover). Under construction it blocks everyone. */
+function gateOpenFor(world: World, b: Building, mover?: PlayerId): boolean {
+  return (
+    b.type === "gate" &&
+    b.progress >= 1 &&
+    mover !== undefined &&
+    sameTeam(world, b.owner, mover)
+  );
+}
+
+function buildingBlocker(world: World, ignore?: EntityId, mover?: PlayerId) {
   return (x: number, y: number): boolean => {
     for (const b of world.buildings) {
       if (b.id === ignore) continue;
+      if (gateOpenFor(world, b, mover)) continue; // friendly gates let `mover` pass
       const d = BUILDING_DEFS[b.type].size;
       if (rectContains(b.tile.x, b.tile.y, d.w, d.h, x, y)) return true;
     }
     return false;
   };
+}
+
+/** Whether a unit owned by `mover` is blocked from standing on tile (tx,ty) by a
+ *  building footprint. A friendly built gate does not block; walls, other
+ *  buildings, and enemy/under-construction gates do. Terrain is separate
+ *  (`isWalkable`). Exported for tests. */
+export function tileBlockedFor(world: World, tx: number, ty: number, mover?: PlayerId): boolean {
+  return buildingBlocker(world, undefined, mover)(tx, ty);
 }
 
 function nearestDropOff(world: World, owner: PlayerId, pos: Vec2): Building | null {
@@ -265,7 +286,7 @@ function approachTile(world: World, b: Building, from: Vec2): Vec2 | null {
 
 function pathToBuilding(world: World, u: Unit, b: Building): Vec2[] {
   const target = approachTile(world, b, u.pos) ?? buildingCenter(b);
-  return findPath(world.map, u.pos, target, buildingBlocker(world, b.id));
+  return findPath(world.map, u.pos, target, buildingBlocker(world, b.id, u.owner));
 }
 
 // ---------------------------------------------------------------- commands
@@ -328,7 +349,7 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
         u.targetEntity = node.id;
         u.lastGatherNode = node.id;
         u.state = "moving";
-        u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world));
+        u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world, undefined, u.owner));
       }
       break;
     }
@@ -482,7 +503,7 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
         u.aggro = { ...goal };
         u.attackedBy = null;
         u.retaliating = false;
-        u.path = findPath(world.map, u.pos, goal, buildingBlocker(world));
+        u.path = findPath(world.map, u.pos, goal, buildingBlocker(world, undefined, u.owner));
       }
       break;
     }
@@ -527,7 +548,7 @@ function orderMove(world: World, u: Unit, tile: Vec2) {
   u.attackedBy = null;
   u.retaliating = false;
   u.repaths = 0;
-  u.path = findPath(world.map, u.pos, tileCenterOf(tile), buildingBlocker(world));
+  u.path = findPath(world.map, u.pos, tileCenterOf(tile), buildingBlocker(world, undefined, u.owner));
 }
 
 /** Begin a single queued order on a unit (does not touch its remaining queue).
@@ -551,7 +572,7 @@ function startOrder(world: World, u: Unit, order: QueuedOrder): void {
       u.attackedBy = null;
       u.retaliating = false;
       u.state = "moving";
-      u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world));
+      u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world, undefined, u.owner));
       break;
     }
     case "attack":
@@ -571,7 +592,7 @@ function startOrder(world: World, u: Unit, order: QueuedOrder): void {
       u.aggro = { ...goal };
       u.attackedBy = null;
       u.retaliating = false;
-      u.path = findPath(world.map, u.pos, goal, buildingBlocker(world));
+      u.path = findPath(world.map, u.pos, goal, buildingBlocker(world, undefined, u.owner));
       break;
     }
   }
@@ -638,12 +659,12 @@ function formationSlots(world: World, anchor: Vec2, units: Unit[]): Vec2[] {
 function repathForMove(world: World, u: Unit): Vec2[] {
   if (u.targetEntity !== null) {
     const node = nodeById(world, u.targetEntity);
-    if (node) return findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world));
+    if (node) return findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world, undefined, u.owner));
     const b = buildingById(world, u.targetEntity);
     if (b) return pathToBuilding(world, u, b);
   }
-  if (u.aggro) return findPath(world.map, u.pos, u.aggro, buildingBlocker(world));
-  if (u.targetTile) return findPath(world.map, u.pos, tileCenterOf(u.targetTile), buildingBlocker(world));
+  if (u.aggro) return findPath(world.map, u.pos, u.aggro, buildingBlocker(world, undefined, u.owner));
+  if (u.targetTile) return findPath(world.map, u.pos, tileCenterOf(u.targetTile), buildingBlocker(world, undefined, u.owner));
   return [];
 }
 
@@ -895,11 +916,11 @@ function spawnFromBuilding(world: World, b: Building, type: UnitType) {
       u.state = "moving";
       u.targetEntity = node.id;
       u.lastGatherNode = node.id;
-      u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world));
+      u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world, undefined, u.owner));
     } else {
       u.state = "moving";
       u.targetTile = rt;
-      u.path = findPath(world.map, u.pos, b.rally, buildingBlocker(world));
+      u.path = findPath(world.map, u.pos, b.rally, buildingBlocker(world, undefined, u.owner));
     }
   }
   world.units.push(u);
@@ -1099,7 +1120,7 @@ function stepAlongPath(world: World, u: Unit): void {
       const lateral = UNIT_DEFS[u.type].speed * TICK_DT;
       const nx = u.pos.x + avoid.x * lateral;
       const ny = u.pos.y + avoid.y * lateral;
-      if (stepOpen(world, nx, ny)) {
+      if (stepOpen(world, nx, ny, u.owner)) {
         u.pos.x = nx;
         u.pos.y = ny;
       }
@@ -1112,11 +1133,12 @@ const AVOID_LOOKAHEAD = 1.1; // tiles ahead we watch for a blocking unit
 const AVOID_STRENGTH = 0.6; // fraction of a step spent sliding sideways
 
 /** True if a unit may occupy the point (walkable terrain, no building footprint). */
-function stepOpen(world: World, x: number, y: number): boolean {
+function stepOpen(world: World, x: number, y: number, mover?: PlayerId): boolean {
   const tx = Math.floor(x);
   const ty = Math.floor(y);
   if (!isWalkable(world.map, tx, ty)) return false;
   for (const b of world.buildings) {
+    if (gateOpenFor(world, b, mover)) continue;
     const d = BUILDING_DEFS[b.type].size;
     if (rectContains(b.tile.x, b.tile.y, d.w, d.h, tx, ty)) return false;
   }
@@ -1170,9 +1192,10 @@ const UNIT_RADIUS = 0.32; // min separation between unit centres = 2 * radius
 function resolveCollisions(world: World): void {
   const minSep = UNIT_RADIUS * 2;
   const w = world.map.width;
-  const blocked = buildingBlocker(world);
-  const open = (x: number, y: number) =>
-    isWalkable(world.map, x, y) && !blocked(x, y);
+  // Owner-aware: a unit is never pushed off its own (friendly) gate tile, and
+  // enemies can't be shoved through one.
+  const open = (x: number, y: number, mover: PlayerId) =>
+    isWalkable(world.map, x, y) && !tileBlockedFor(world, x, y, mover);
 
   const cells = new Map<number, Unit[]>();
   for (const u of world.units) {
@@ -1184,9 +1207,9 @@ function resolveCollisions(world: World): void {
 
   const push = (u: Unit, dx: number, dy: number) => {
     const nx = u.pos.x + dx;
-    if (open(Math.floor(nx), Math.floor(u.pos.y))) u.pos.x = nx;
+    if (open(Math.floor(nx), Math.floor(u.pos.y), u.owner)) u.pos.x = nx;
     const ny = u.pos.y + dy;
-    if (open(Math.floor(u.pos.x), Math.floor(ny))) u.pos.y = ny;
+    if (open(Math.floor(u.pos.x), Math.floor(ny), u.owner)) u.pos.y = ny;
   };
   // Gathering/constructing units are "anchored": others flow around them, but
   // they aren't displaced (which otherwise causes gather/move state flicker).
@@ -1258,7 +1281,7 @@ function doGather(world: World, u: Unit): void {
   if (distToTile(u.pos, node.tile) > REACH_DIST) {
     // walk to it
     u.state = "moving";
-    u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world));
+    u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world, undefined, u.owner));
     return;
   }
   u.lastGatherNode = node.id; // remember it so we can resume after a build detour
@@ -1297,7 +1320,7 @@ function tryDeposit(world: World, u: Unit): void {
     // persist even at 0 (they regrow), so stick with them too.
     if (node && (node.amount > 0 || node.owner !== undefined)) {
       u.state = "moving";
-      u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world));
+      u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world, undefined, u.owner));
     } else {
       // Node exhausted/gone: auto-advance to the nearest same-kind node within
       // reach and keep gathering, instead of standing idle by an empty patch.
@@ -1306,7 +1329,7 @@ function tryDeposit(world: World, u: Unit): void {
         u.targetEntity = next.id;
         u.lastGatherNode = next.id;
         u.state = "moving";
-        u.path = findPath(world.map, u.pos, tileCenterOf(next.tile), buildingBlocker(world));
+        u.path = findPath(world.map, u.pos, tileCenterOf(next.tile), buildingBlocker(world, undefined, u.owner));
       } else {
         u.state = "idle";
         u.targetEntity = null;
@@ -1412,7 +1435,7 @@ function resumeGatherOrIdle(world: World, u: Unit): void {
     if (node && node.amount > 0) {
       u.targetEntity = node.id;
       u.state = "moving";
-      u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world));
+      u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world, undefined, u.owner));
       return;
     }
   }
@@ -1436,7 +1459,7 @@ function doAttack(world: World, u: Unit): void {
     if (carcass && carcass.amount > 0 && carcass.owner === undefined) {
       u.lastGatherNode = carcass.id;
       u.state = "moving";
-      u.path = findPath(world.map, u.pos, tileCenterOf(carcass.tile), buildingBlocker(world));
+      u.path = findPath(world.map, u.pos, tileCenterOf(carcass.tile), buildingBlocker(world, undefined, u.owner));
       return;
     }
     u.targetEntity = null;
@@ -1464,7 +1487,7 @@ function doAttack(world: World, u: Unit): void {
   if (targetAnimal) {
     const range = dist(u.pos, targetAnimal.pos);
     if (range > def.range) {
-      u.path = findPath(world.map, u.pos, targetAnimal.pos, buildingBlocker(world));
+      u.path = findPath(world.map, u.pos, targetAnimal.pos, buildingBlocker(world, undefined, u.owner));
       stepAlongPath(world, u);
       return;
     }
@@ -1505,7 +1528,7 @@ function doAttack(world: World, u: Unit): void {
       world.map,
       u.pos,
       targetUnit ? targetUnit.pos : buildingCenter(targetBuilding!),
-      buildingBlocker(world, targetBuilding?.id),
+      buildingBlocker(world, targetBuilding?.id, u.owner),
     );
     stepAlongPath(world, u);
     return;
@@ -1539,7 +1562,7 @@ function resumeAggro(world: World, u: Unit): boolean {
     return true;
   }
   u.state = "moving";
-  u.path = findPath(world.map, u.pos, u.aggro, buildingBlocker(world));
+  u.path = findPath(world.map, u.pos, u.aggro, buildingBlocker(world, undefined, u.owner));
   return true;
 }
 
