@@ -5,6 +5,8 @@ import soldierUrl from "../assets/soldier.svg";
 import archerUrl from "../assets/archer.svg";
 import cavalryUrl from "../assets/cavalry.svg";
 import ramUrl from "../assets/ram.svg";
+import mangonelUrl from "../assets/mangonel.svg";
+import trebuchetUrl from "../assets/trebuchet.svg";
 import townCenterUrl from "../assets/town_center.svg";
 import houseUrl from "../assets/house.svg";
 import barracksUrl from "../assets/barracks.svg";
@@ -37,6 +39,8 @@ import soldierAccentUrl from "../assets/soldier_accent.svg";
 import archerAccentUrl from "../assets/archer_accent.svg";
 import cavalryAccentUrl from "../assets/cavalry_accent.svg";
 import ramAccentUrl from "../assets/ram_accent.svg";
+import mangonelAccentUrl from "../assets/mangonel_accent.svg";
+import trebuchetAccentUrl from "../assets/trebuchet_accent.svg";
 import townCenterAccentUrl from "../assets/town_center_accent.svg";
 import houseAccentUrl from "../assets/house_accent.svg";
 import barracksAccentUrl from "../assets/barracks_accent.svg";
@@ -58,6 +62,8 @@ export type SpriteKey =
   | "archer"
   | "cavalry"
   | "ram"
+  | "mangonel"
+  | "trebuchet"
   | "town_center"
   | "house"
   | "barracks"
@@ -91,6 +97,8 @@ export type SpriteKey =
   | "archer_accent"
   | "cavalry_accent"
   | "ram_accent"
+  | "mangonel_accent"
+  | "trebuchet_accent"
   | "town_center_accent"
   | "house_accent"
   | "barracks_accent"
@@ -112,6 +120,8 @@ const URLS: Record<SpriteKey, string> = {
   archer: archerUrl,
   cavalry: cavalryUrl,
   ram: ramUrl,
+  mangonel: mangonelUrl,
+  trebuchet: trebuchetUrl,
   town_center: townCenterUrl,
   house: houseUrl,
   barracks: barracksUrl,
@@ -147,6 +157,8 @@ const URLS: Record<SpriteKey, string> = {
   archer_accent: archerAccentUrl,
   cavalry_accent: cavalryAccentUrl,
   ram_accent: ramAccentUrl,
+  mangonel_accent: mangonelAccentUrl,
+  trebuchet_accent: trebuchetAccentUrl,
   town_center_accent: townCenterAccentUrl,
   house_accent: houseAccentUrl,
   barracks_accent: barracksAccentUrl,

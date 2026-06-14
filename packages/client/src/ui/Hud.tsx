@@ -42,6 +42,8 @@ const UNIT_LABEL: Record<UnitType, string> = {
   archer: "Archer",
   cavalry: "Cavalry",
   ram: "Ram",
+  mangonel: "Mangonel",
+  trebuchet: "Trebuchet",
 };
 const UNIT_ICON: Record<UnitType, string> = {
   worker: "👷",
@@ -49,6 +51,8 @@ const UNIT_ICON: Record<UnitType, string> = {
   archer: "🏹",
   cavalry: "🐎",
   ram: "🐏",
+  mangonel: "🪨",
+  trebuchet: "🏰",
 };
 export const BUILDING_LABEL: Record<BuildingType, string> = {
   town_center: "Town Center",

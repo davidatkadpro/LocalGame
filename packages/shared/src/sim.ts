@@ -1621,6 +1621,20 @@ function doAttack(world: World, u: Unit): void {
       // Remember the attacker so an idle victim fights back (auto-retaliation).
       targetUnit.attackedBy = u.id;
       targetUnit.attackedTtl = RETALIATE_TTL_MS;
+      // §7.7 siege splash: a mangonel also damages every other enemy unit bunched
+      // around the impact, punishing massed (e.g. archer) formations. Enemies
+      // only — no friendly fire — keeping it deterministic and un-griefable.
+      if (def.splashRadius && def.splashRadius > 0) {
+        for (const e of world.units) {
+          if (e.id === targetUnit.id || e.hp <= 0) continue;
+          if (sameTeam(world, e.owner, u.owner)) continue;
+          if (dist(e.pos, targetUnit.pos) > def.splashRadius) continue;
+          const sd = dmg * damageMultiplier(u.type, e.type);
+          e.hp -= incomingDamage(world.players[e.owner], e.type, sd);
+          e.attackedBy = u.id;
+          e.attackedTtl = RETALIATE_TTL_MS;
+        }
+      }
     } else if (targetBuilding) targetBuilding.hp -= dmg * damageMultiplier(u.type, "building");
     u.attackCooldown = def.attackMs;
   }

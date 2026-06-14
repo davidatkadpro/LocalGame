@@ -469,10 +469,11 @@ legend: 🆕 brand new · 🔨 expand something we already have · ✅ shipped.
 
 **Where we are today (baseline).** Worth knowing before expanding:
 
-- **Units:** `worker`, `soldier`, `archer`, `cavalry` (raider), `ram` (siege).
-  Counters with building bonuses live in
-  [COUNTERS](packages/shared/src/constants.ts#L297) (ram ×5 vs buildings, the
-  soldier→cavalry→archer→soldier triangle, etc.).
+- **Units:** `worker`, `soldier`, `archer`, `cavalry` (raider), `ram` /
+  `mangonel` (AoE splash) / `trebuchet` (long-range siege). Counters with
+  building bonuses live in [COUNTERS](packages/shared/src/constants.ts#L297) (ram
+  ×5 / trebuchet ×6 vs buildings, the soldier→cavalry→archer→soldier triangle,
+  soldiers & cavalry counter all siege, etc.).
 - **Buildings:** `town_center`, `house`, `barracks`, `stable`, `blacksmith`,
   `tower`, `storehouse` (drop-off), `lumber_camp` / `mining_camp` / `mill`
   (specialised drop-offs), `farm`, `wall` / `stone_wall` / `fortified_wall`
@@ -631,7 +632,7 @@ in the build-chain), [constants.ts](packages/shared/src/constants.ts) (tier defs
 [scripts/gates.test.ts](scripts/gates.test.ts) +
 [scripts/wall_tiers.test.ts](scripts/wall_tiers.test.ts).
 
-### 7.7 Siege expansion: mangonel & trebuchet  — 🔨 **M**
+### 7.7 Siege expansion: mangonel & trebuchet  — 🔨 **M** — ✅ done
 
 **Have today.** `ram` (×5 vs buildings) trained at `siege_workshop`; near-
 useless vs units, needs an escort.
@@ -641,6 +642,17 @@ siege workshop and the COUNTERS table; new bit is area-of-effect damage.
 **Files.** [constants.ts](packages/shared/src/constants.ts) (defs + counters),
 [sim.ts](packages/shared/src/sim.ts) (AoE damage), assets,
 [Hud.tsx](packages/client/src/ui/Hud.tsx).
+**Status.** Shipped both engines at the siege workshop (Imperial). **Mangonel** —
+range 6 (out-ranges archers), a new `splashRadius` (1.5) makes each shot damage
+*every* enemy unit bunched around the impact, so it shreds massed archer/infantry
+balls (the AoE loop in `doAttack` is enemy-only, no friendly fire, fully
+deterministic). **Trebuchet** — range 11 (out-ranges towers and the TC), ×6 vs
+buildings (180/hit — out-sieges the ram's 70) but ~10 vs units and very slow, so
+it's helpless once meleed. Counter web extended: soldiers **and** cavalry run down
+both engines; archers shred a lone trebuchet but a mangonel out-ranges and
+splashes them. New SVGs (catapult + counterweight trebuchet) with team pennants;
+train buttons are auto-driven by `canTrain`. Covered by `scripts/siege.test.ts`
+(roster wiring, role stats/counters, and a live splash-hits-the-clump check).
 
 ### 7.8 Cavalry (Stable)  — 🆕 **M** — ✅ done
 

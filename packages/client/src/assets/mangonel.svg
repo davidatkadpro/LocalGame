@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral base: a catapult — timber frame, a torsion throwing arm, a stone in
+       the bucket. The pennant is a separate team-colour accent layer. -->
+  <defs>
+    <linearGradient id="mgWood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9c6f3e"/>
+      <stop offset="1" stop-color="#6b4a27"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="50" cy="90" rx="30" ry="5" fill="#000000" opacity="0.2"/>
+  <!-- base beam + wheels -->
+  <rect x="18" y="74" width="64" height="8" rx="2" fill="url(#mgWood)"/>
+  <circle cx="30" cy="84" r="7" fill="#3a2c1a"/>
+  <circle cx="70" cy="84" r="7" fill="#3a2c1a"/>
+  <circle cx="30" cy="84" r="2.5" fill="#6b4a27"/>
+  <circle cx="70" cy="84" r="2.5" fill="#6b4a27"/>
+  <!-- A-frame support -->
+  <path d="M40 74 L52 40 L56 40 L46 74 Z" fill="url(#mgWood)"/>
+  <path d="M64 74 L54 40 L58 40 L70 74 Z" fill="url(#mgWood)"/>
+  <!-- throwing arm, cocked back -->
+  <rect x="20" y="46" width="40" height="6" rx="3" fill="#7a5630" transform="rotate(-28 54 49)"/>
+  <!-- bucket + stone -->
+  <circle cx="26" cy="34" r="7.5" fill="#5a5a5f"/>
+  <circle cx="26" cy="33" r="4.5" fill="#8a8a90"/>
+  <!-- cross brace -->
+  <rect x="44" y="56" width="22" height="4" rx="2" fill="#5d3f22" transform="rotate(6 55 58)"/>
+</svg>

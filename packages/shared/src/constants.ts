@@ -44,6 +44,9 @@ export interface UnitDef {
   trainedAt: BuildingType;
   /** earliest age this unit can be trained (0 = Dark, 1 = Feudal, 2 = Imperial) */
   minAge?: number;
+  /** §7.7 siege splash: when set, an attack also damages every enemy unit within
+   *  this radius (tiles) of the target — the mangonel's anti-clump role. */
+  splashRadius?: number;
 }
 
 export const UNIT_DEFS: Record<UnitType, UnitDef> = {
@@ -116,10 +119,39 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     trainedAt: "siege_workshop",
     minAge: 2, // Imperial
   },
+  mangonel: {
+    type: "mangonel",
+    hp: 80,
+    speed: 1.3, // slow siege; needs an escort
+    sight: 8,
+    cost: { wood: 160, gold: 75 },
+    popCost: 2,
+    trainMs: 16000,
+    damage: 14,
+    range: 6, // out-ranges archers (5) so it can open on a massed ball
+    attackMs: 2500, // slow reload
+    trainedAt: "siege_workshop",
+    minAge: 2, // Imperial
+    splashRadius: 1.5, // anti-clump: shreds bunched archers/infantry (§7.7)
+  },
+  trebuchet: {
+    type: "trebuchet",
+    hp: 100,
+    speed: 1.0, // very slow: a positional siege weapon
+    sight: 10,
+    cost: { wood: 200, gold: 200 },
+    popCost: 3, // heavy
+    trainMs: 20000,
+    damage: 30, // ×6 vs buildings (see DAMAGE_COUNTERS) = 180/hit; ~10 vs units
+    range: 11, // very long range — out-ranges towers (5) and the TC (6)
+    attackMs: 4000, // ponderous
+    trainedAt: "siege_workshop",
+    minAge: 2, // Imperial
+  },
 };
 
 /** Unit types that count as military (for combat upgrades). */
-export const MILITARY: UnitType[] = ["soldier", "archer", "cavalry", "ram"];
+export const MILITARY: UnitType[] = ["soldier", "archer", "cavalry", "ram", "mangonel", "trebuchet"];
 
 export interface BuildingDef {
   type: BuildingType;
@@ -372,7 +404,7 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     buildMs: 22000,
     providesPop: 0,
     isDropOff: false,
-    canTrain: ["ram"], // gates siege behind a dedicated tech building
+    canTrain: ["ram", "mangonel", "trebuchet"], // gates siege behind a dedicated tech building
     buildable: true,
     minAge: 2, // Imperial
   },
@@ -623,15 +655,25 @@ export function incomingDamage(target: Player, type: UnitType, dmg: number): num
 const DAMAGE_COUNTERS: Partial<
   Record<UnitType, Partial<Record<UnitType | "building", number>>>
 > = {
-  // Soldiers (infantry) run down archers and rams, and brace against cavalry.
-  soldier: { archer: 1.5, cavalry: 1.5, ram: 1.5 },
+  // Soldiers (infantry) run down archers, cavalry, and all siege.
+  soldier: { archer: 1.5, cavalry: 1.5, ram: 1.5, mangonel: 1.5, trebuchet: 1.5 },
   // Archers shred soldiers/rams at range, harass workers, weak on structures.
-  archer: { soldier: 1.75, ram: 1.5, worker: 1.25, building: 0.5 },
-  // Cavalry: a raider — rides down archers and workers, but soldiers counter it
-  // and it can't besiege (closes the triangle: soldier > cavalry > archer > soldier).
-  cavalry: { archer: 1.5, worker: 1.5, building: 0.5 },
+  // They pick apart a lone trebuchet, but a mangonel out-ranges and splashes them.
+  archer: { soldier: 1.75, ram: 1.5, trebuchet: 1.5, worker: 1.25, building: 0.5 },
+  // Cavalry: a raider — rides down archers, workers, and the slow siege line, but
+  // soldiers counter it and it can't besiege (soldier > cavalry > archer > soldier).
+  cavalry: { archer: 1.5, worker: 1.5, mangonel: 1.5, trebuchet: 1.5, building: 0.5 },
   // Rams demolish buildings/walls but are near-useless against units (needs an escort).
   ram: { worker: 0.34, soldier: 0.34, archer: 0.34, cavalry: 0.34, ram: 0.34, building: 5 },
+  // Mangonel: anti-clump. Its damage comes from the area splash (see splashRadius),
+  // so per-target it's unremarkable and weak against buildings.
+  mangonel: { building: 0.4 },
+  // Trebuchet: the premier siege engine — devastating, long-range anti-building,
+  // but nearly useless if an enemy closes to melee it.
+  trebuchet: {
+    worker: 0.34, soldier: 0.34, archer: 0.34, cavalry: 0.34,
+    ram: 0.34, mangonel: 0.34, trebuchet: 0.34, building: 6,
+  },
 };
 
 export function damageMultiplier(attacker: UnitType, target: UnitType | "building"): number {

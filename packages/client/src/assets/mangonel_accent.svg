@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Team-colour accent: a small pennant on the A-frame. -->
+  <defs>
+    <linearGradient id="acc" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cccccc"/>
+    </linearGradient>
+  </defs>
+  <rect x="53" y="34" width="2.5" height="14" fill="#6b4a27"/>
+  <polygon points="55,34 70,38 55,42" fill="url(#acc)"/>
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral base: a trebuchet — a tall A-frame, a long pivoting beam with a
+       heavy counterweight, and a sling. Pennant is a team-colour accent layer. -->
+  <defs>
+    <linearGradient id="tbWood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9c6f3e"/>
+      <stop offset="1" stop-color="#6b4a27"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="50" cy="92" rx="34" ry="5" fill="#000000" opacity="0.2"/>
+  <!-- base sill -->
+  <rect x="16" y="80" width="68" height="7" rx="2" fill="url(#tbWood)"/>
+  <!-- tall A-frame (pivot at apex ~50,34) -->
+  <path d="M30 80 L48 34 L52 34 L40 80 Z" fill="url(#tbWood)"/>
+  <path d="M70 80 L52 34 L48 34 L60 80 Z" fill="url(#tbWood)"/>
+  <rect x="34" y="58" width="32" height="4" rx="2" fill="#5d3f22"/>
+  <!-- throwing beam pivoted at the apex: short heavy end down-left, long end up-right -->
+  <rect x="18" y="32" width="66" height="5" rx="2.5" fill="#7a5630" transform="rotate(-34 50 34)"/>
+  <!-- counterweight box on the short arm (lower-left) -->
+  <rect x="22" y="52" width="16" height="14" rx="2" fill="#5a5a5f"/>
+  <rect x="22" y="52" width="16" height="5" rx="2" fill="#74747c"/>
+  <!-- sling + stone hanging off the long arm (upper-right) -->
+  <line x1="74" y1="14" x2="78" y2="30" stroke="#3a2c1a" stroke-width="1.5"/>
+  <circle cx="79" cy="33" r="5" fill="#8a8a90" stroke="#55555c" stroke-width="1"/>
+  <!-- pivot hub -->
+  <circle cx="50" cy="34" r="3.4" fill="#3a2c1a"/>
+</svg>
