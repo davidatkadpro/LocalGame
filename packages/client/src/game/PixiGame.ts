@@ -113,8 +113,11 @@ export class PixiGame {
   private unitFx = new Map<number, { hp: number; lastX: number; facing: number; flashUntil: number }>();
   private buildingFx = new Map<number, { hp: number; flashUntil: number }>();
   private dying: { sp: Sprite; born: number }[] = [];
-  private projectiles: { x: number; y: number; tx: number; ty: number; born: number; dur: number }[] = [];
+  private projectiles: { x: number; y: number; tx: number; ty: number; born: number; dur: number; impacted?: boolean }[] = [];
   private nextShot = new Map<number, number>(); // shooter id -> earliest next projectile time
+  // short-lived hit bursts: "spark" = arrow landing, "dust" = ram/melee impact
+  private impacts: { x: number; y: number; born: number; dur: number; kind: "spark" | "dust" }[] = [];
+  private lastCombatSfx = 0; // throttle so a big battle doesn't become a cacophony
 
   // "under attack" alerting: throttle a minimap ping per map region + a sound.
   private attackPingCells = new Map<number, number>();
@@ -478,10 +481,14 @@ export class PixiGame {
       const accent = sp.children[0] as Sprite | undefined;
       if (accent) accent.tint = flashing ? 0xff5a5a : this.colorOf(u.owner);
 
-      // ranged units flick an arrow at the nearest enemy while attacking
+      // combat feel: archers loose arrows; ram/soldier kick up impact bursts.
       if (u.type === "archer" && u.state === "attacking") {
         const e = this.nearestEnemy(x, y, curr, UNIT_DEFS.archer.range);
         if (e) this.emitShot(u.id, x, y - 0.2, e.x, e.y, 1400);
+      } else if (u.type === "ram" && u.state === "attacking") {
+        if (this.fireReady(u.id, 700)) this.emitImpact(x + fx.facing * 0.5, y + 0.1, "dust");
+      } else if (u.type === "soldier" && u.state === "attacking") {
+        if (this.fireReady(u.id, 650)) this.emitImpact(x + fx.facing * 0.45, y, "spark");
       }
     }
     for (const [id, sp] of this.unitSprites) {
@@ -741,17 +748,29 @@ export class PixiGame {
     return best;
   }
 
+  /** True at most once per `cadence` ms per shooter (approximates fire rate). */
+  private fireReady(shooterId: number, cadence: number): boolean {
+    if (this.now < (this.nextShot.get(shooterId) ?? 0)) return false;
+    this.nextShot.set(shooterId, this.now + cadence);
+    return true;
+  }
+
   /** Spawn a projectile visual on a per-shooter cadence (approximates fire rate). */
   private emitShot(shooterId: number, fx: number, fy: number, tx: number, ty: number, cadence: number): void {
-    const next = this.nextShot.get(shooterId) ?? 0;
-    if (this.now < next) return;
-    this.nextShot.set(shooterId, this.now + cadence);
+    if (!this.fireReady(shooterId, cadence)) return;
     this.projectiles.push({ x: fx, y: fy, tx, ty, born: this.now, dur: 260 });
   }
 
   private drawProjectiles(): void {
     const g = this.projLayer;
     g.clear();
+    // An arrow that has reached its target spawns a spark burst, once.
+    for (const p of this.projectiles) {
+      if (!p.impacted && this.now - p.born >= p.dur) {
+        p.impacted = true;
+        this.emitImpact(p.tx, p.ty, "spark");
+      }
+    }
     this.projectiles = this.projectiles.filter((p) => this.now - p.born < p.dur);
     for (const p of this.projectiles) {
       const prog = (this.now - p.born) / p.dur;
@@ -766,6 +785,45 @@ export class PixiGame {
         .lineTo(cx, cy)
         .stroke({ width: 0.07, color: 0xffe9a8, alpha: 0.95 });
       g.circle(cx, cy, 0.05).fill({ color: 0xfff3cc, alpha: 0.95 });
+    }
+    this.drawImpacts(g);
+  }
+
+  /** Queue a hit burst (sparks for arrows, dust for ram/melee) at a point. */
+  private emitImpact(x: number, y: number, kind: "spark" | "dust"): void {
+    this.impacts.push({ x, y, born: this.now, dur: kind === "dust" ? 300 : 200, kind });
+    // One throttled combat blip regardless of how many hits land this instant.
+    if (this.now - this.lastCombatSfx > 110) {
+      this.lastCombatSfx = this.now;
+      if (kind === "dust") sfx.thud();
+      else sfx.hit();
+    }
+  }
+
+  /** Render the active hit bursts: an expanding ring plus a few thrown flecks. */
+  private drawImpacts(g: Graphics): void {
+    this.impacts = this.impacts.filter((p) => this.now - p.born < p.dur);
+    for (const p of this.impacts) {
+      const prog = (this.now - p.born) / p.dur;
+      const alpha = 1 - prog;
+      if (p.kind === "dust") {
+        // ram/melee: a brown ground puff that swells and fades.
+        const r = 0.16 + 0.5 * prog;
+        g.circle(p.x, p.y, r).stroke({ width: 0.07, color: 0xc9b08a, alpha: alpha * 0.7 });
+        g.circle(p.x, p.y, r * 0.6).fill({ color: 0xb89a6e, alpha: alpha * 0.35 });
+      } else {
+        // arrow: a bright spark ring plus a handful of thrown flecks.
+        const r = 0.1 + 0.36 * prog;
+        g.circle(p.x, p.y, r).stroke({ width: 0.05, color: 0xffe9a8, alpha: alpha * 0.9 });
+        const reach = 0.18 + 0.34 * prog;
+        for (let i = 0; i < 5; i++) {
+          const ang = (i / 5) * Math.PI * 2 + p.born; // per-burst rotation
+          g.circle(p.x + Math.cos(ang) * reach, p.y + Math.sin(ang) * reach, 0.04).fill({
+            color: 0xfff3cc,
+            alpha,
+          });
+        }
+      }
     }
   }
 

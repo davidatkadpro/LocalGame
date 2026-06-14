@@ -95,6 +95,14 @@ export const sfx = {
       { freq: 784, dur: 0.16, type: "sine", gain: 0.4, delay: 0.18 },
     ]),
   error: () => play([{ freq: 200, to: 120, dur: 0.18, type: "sawtooth", gain: 0.3 }]),
+  // soft tick for an arrow landing (kept quiet + throttled by the caller)
+  hit: () => play([{ freq: 440, to: 180, dur: 0.05, type: "square", gain: 0.16 }]),
+  // heavy low thump for a ram / melee impact against a structure
+  thud: () =>
+    play([
+      { freq: 150, to: 55, dur: 0.16, type: "sine", gain: 0.45 },
+      { freq: 90, to: 50, dur: 0.12, type: "square", gain: 0.18, delay: 0.01 },
+    ]),
   // urgent two-tone klaxon for "your base/army is under attack"
   alert: () =>
     play([

@@ -617,7 +617,7 @@ points, attack-move, stop, idle-worker cycle (`.`), go-to-TC (`H`), double-click
 select-by-type, a selection-summary-by-type panel, affordability cues + cost
 badges, under-attack minimap pings, resource-depletion visuals.
 
-### 8.1 Projectiles & impact  — 🆕 **S–M** — *top pick, client-only* — *the biggest feel gap*
+### 8.1 Projectiles & impact  — 🆕 **S–M** — *top pick, client-only* — ✅ done
 
 Today archers, towers, and rams deal damage **instantly** with only a flash on
 the target — nothing flies. Add arrow arcs from archers/towers, a ram impact
@@ -625,6 +625,10 @@ thud + dust, and small hit-sparks. Purely cosmetic (derived from the snapshot
 stream), so it's **deterministic-safe** — no sim change.
 **Files.** [PixiGame.ts](packages/client/src/game/PixiGame.ts),
 [audio.ts](packages/client/src/game/audio.ts).
+**Status.** Arrow flight already existed (archers + towers). Added: a spark
+burst where each arrow lands, brown dust puffs for ram battering and soldier
+melee, and throttled synth `hit`/`thud` sounds (one combat blip per ~110ms so a
+big battle stays punchy, not noisy). Cadence gate refactored into `fireReady`.
 
 ### 8.2 On-map unit-state clarity  — 🆕 **S** — ✅ done
 
