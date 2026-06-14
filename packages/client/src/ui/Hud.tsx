@@ -7,7 +7,17 @@ import type {
   UnitType,
   UpgradeId,
 } from "@bg/shared";
-import { BUILDING_DEFS, UNIT_DEFS, UPGRADE_DEFS, canAfford } from "@bg/shared";
+import {
+  AGE_DEFS,
+  BUILDING_DEFS,
+  MAX_AGE,
+  UNIT_DEFS,
+  UPGRADE_DEFS,
+  canAfford,
+  minAgeOfBuilding,
+  minAgeOfUnit,
+  minAgeOfUpgrade,
+} from "@bg/shared";
 import { useStore } from "../net/store";
 import { isMuted, toggleMuted } from "../game/audio";
 
@@ -83,6 +93,7 @@ export function Hud({
   const pop = snap?.me.pop ?? 0;
   const popCap = snap?.me.popCap ?? 0;
   const upgrades = snap?.me.upgrades ?? [];
+  const age = snap?.me.age ?? 0;
 
   const me = snap?.me.playerId;
   const myWorkers = snap
@@ -123,6 +134,9 @@ export function Hud({
             🏠 Build houses
           </span>
         )}
+        <span className="age-badge" title="Your current age — advance at the Town Center">
+          ⌛ {AGE_DEFS[age].name}
+        </span>
         {upgrades.length > 0 && (
           <span className="upgrades" title="Researched upgrades">
             {upgrades.map((u) => (
@@ -233,14 +247,29 @@ export function Hud({
 /* ---------- Panel views (shared by desktop row and mobile drawer) ---------- */
 
 function BuildPanelView({ onPlace }: { onPlace: (b: BuildingType) => void }) {
+  const age = useStore((s) => s.curr?.me.age ?? 0);
   return (
     <div className="panel panel-build">
       <div className="panel-title">Build</div>
-      {BUILDABLE.map((d) => (
-        <button key={d.type} onClick={() => onPlace(d.type)}>
-          {BUILDING_LABEL[d.type]} <CostBadge cost={d.cost} />
-        </button>
-      ))}
+      {BUILDABLE.map((d) => {
+        const need = minAgeOfBuilding(d.type);
+        const locked = age < need;
+        return (
+          <button
+            key={d.type}
+            onClick={() => onPlace(d.type)}
+            disabled={locked}
+            title={locked ? `Unlocks in the ${AGE_DEFS[need].name}` : undefined}
+          >
+            {BUILDING_LABEL[d.type]}{" "}
+            {locked ? (
+              <span className="muted small">🔒 {AGE_DEFS[need].name.split(" ")[0]}</span>
+            ) : (
+              <CostBadge cost={d.cost} />
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -371,8 +400,10 @@ function ControlsText() {
       <b> Ctrl+1–9</b> sets a control group, <b>1–9</b> recalls it (double-tap to centre). Select a
       building, then right-click/tap to set its rally point. Right-click/tap a <b>damaged building</b>{" "}
       with workers to repair it. <b>Shift+click</b> queues orders (move/gather/attack). Pick{" "}
-      <b>Wall</b> (with a worker selected) and drag to build a line. Arrow keys / drag to pan, wheel /
-      pinch to zoom.
+      <b>Wall</b> (with a worker selected) and drag to build a line. You start in the <b>Dark Age</b>
+      {" "}(economy only) — build a storehouse or farm, then <b>select your Town Center and Advance
+      Age</b> to unlock barracks, military, and later siege. Arrow keys / drag to pan, wheel / pinch
+      to zoom.
       <br />
       <b>Touch:</b> tap <b>▣ Box select</b> then drag to marquee units; double-tap a unit to grab
       all of its type on screen; long-press to issue a command (e.g. send a worker to finish a
@@ -568,6 +599,7 @@ function BuildingPanel({
   owned: UpgradeId[];
 }) {
   const command = useStore((s) => s.command);
+  const curr = useStore((s) => s.curr);
   const [confirmDemolish, setConfirmDemolish] = useState(false);
   // Reset the demolish confirmation whenever a different building is selected.
   useEffect(() => setConfirmDemolish(false), [building.id]);
@@ -575,6 +607,22 @@ function BuildingPanel({
   const label = BUILDING_LABEL[building.type as BuildingType];
   const built = building.progress >= 1;
   const queue = building.queue ?? [];
+
+  // Age advancement (only meaningful at the town center).
+  const age = curr?.me.age ?? 0;
+  const ageUpTimer = curr?.me.ageUpTimer ?? 0;
+  const ageUpMs = curr?.me.ageUpMs ?? 0;
+  const me = curr?.me.playerId;
+  const advancing = ageUpTimer > 0;
+  const ageProgress = advancing && ageUpMs > 0 ? 1 - ageUpTimer / ageUpMs : 0;
+  const nextDef = age < MAX_AGE ? AGE_DEFS[age + 1] : null;
+  const prereqMet =
+    nextDef && curr
+      ? nextDef.prereq.some((t) =>
+          curr.buildings.some((b) => b.owner === me && b.progress >= 1 && b.type === t),
+        )
+      : false;
+  const canAdvance = !!nextDef && !advancing && prereqMet && canAfford(resources, nextDef.advanceCost);
   const trainProgress =
     building.produceMs && building.produceMs > 0
       ? 1 - (building.produceTimer ?? 0) / building.produceMs
@@ -600,18 +648,64 @@ function BuildingPanel({
         </div>
       )}
 
+      {built && building.type === "town_center" && (
+        <div className="age-advance">
+          {nextDef ? (
+            advancing ? (
+              <>
+                <div className="small muted">Advancing to the {nextDef.name}…</div>
+                <div className="progress">
+                  <div className="progress-fill" style={{ width: `${Math.round(ageProgress * 100)}%` }} />
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  disabled={!canAdvance}
+                  title={
+                    prereqMet
+                      ? `Advance your civilization to the ${nextDef.name}`
+                      : `Needs a completed ${nextDef.prereq.map((t) => BUILDING_LABEL[t]).join(" or ")}`
+                  }
+                  onClick={() => command({ c: "advanceAge", building: building.id })}
+                >
+                  ⌛ Advance to {nextDef.name} <CostBadge cost={nextDef.advanceCost} />
+                </button>
+                {!prereqMet && (
+                  <div className="small muted">
+                    🔒 Needs a {nextDef.prereq.map((t) => BUILDING_LABEL[t]).join(" or ")}
+                  </div>
+                )}
+              </>
+            )
+          ) : (
+            <div className="small muted">⌛ {AGE_DEFS[age].name} — fully advanced</div>
+          )}
+        </div>
+      )}
+
       {built && def.canTrain.length > 0 && (
         <>
           <div className="train-row">
-            {def.canTrain.map((u) => (
-              <button
-                key={u}
-                disabled={!canAfford(resources, UNIT_DEFS[u].cost)}
-                onClick={() => command({ c: "train", building: building.id, unit: u })}
-              >
-                + {UNIT_LABEL[u]} <CostBadge cost={UNIT_DEFS[u].cost} />
-              </button>
-            ))}
+            {def.canTrain.map((u) => {
+              const needAge = minAgeOfUnit(u);
+              const locked = age < needAge;
+              return (
+                <button
+                  key={u}
+                  disabled={locked || !canAfford(resources, UNIT_DEFS[u].cost)}
+                  title={locked ? `Unlocks in the ${AGE_DEFS[needAge].name}` : undefined}
+                  onClick={() => command({ c: "train", building: building.id, unit: u })}
+                >
+                  + {UNIT_LABEL[u]}{" "}
+                  {locked ? (
+                    <span className="muted small">🔒 {AGE_DEFS[needAge].name.split(" ")[0]}</span>
+                  ) : (
+                    <CostBadge cost={UNIT_DEFS[u].cost} />
+                  )}
+                </button>
+              );
+            })}
           </div>
           {queue.length > 0 && (
             <>
@@ -648,15 +742,22 @@ function BuildingPanel({
               const have = owned.includes(id);
               const busy = building.research != null;
               const poor = !canAfford(resources, u.cost);
+              const needAge = minAgeOfUpgrade(id);
+              const locked = age < needAge;
               return (
                 <button
                   key={id}
-                  title={u.blurb}
-                  disabled={have || busy || poor}
+                  title={locked ? `Unlocks in the ${AGE_DEFS[needAge].name}` : u.blurb}
+                  disabled={have || busy || poor || locked}
                   onClick={() => command({ c: "research", building: building.id, upgrade: id })}
                 >
                   {have ? "✓ " : ""}
-                  {u.name} {have ? null : <CostBadge cost={u.cost} />}
+                  {u.name}{" "}
+                  {have ? null : locked ? (
+                    <span className="muted small">🔒 {AGE_DEFS[needAge].name.split(" ")[0]}</span>
+                  ) : (
+                    <CostBadge cost={u.cost} />
+                  )}
                 </button>
               );
             })}

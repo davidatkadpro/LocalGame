@@ -306,6 +306,28 @@ button.primary:hover:not(:disabled) {
   0%, 100% { opacity: 0.65; }
   50% { opacity: 1; }
 }
+/* Current age, shown in the top resource bar. */
+.age-badge {
+  align-self: center;
+  color: #ffd479;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* Advance-Age control inside the Town Center panel. */
+.age-advance {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0;
+  padding: 6px;
+  border: 1px solid #4a4326;
+  border-radius: 6px;
+  background: rgba(255, 212, 121, 0.08);
+}
+.age-advance button {
+  width: 100%;
+}
 
 .hud-bottom {
   position: absolute;

@@ -482,7 +482,7 @@ legend: 🆕 brand new · 🔨 expand something we already have · ✅ shipped.
 - **Systems:** fog/teams, leaderboard, repair/demolish, under-attack alerts +
   minimap pings (§5.2 ✅), stop/H/double-click QoL, resource-depletion visuals.
 
-### 7.1 Ages (Dark → Feudal → Castle → Imperial)  — 🆕 **L** — *the spine*
+### 7.1 Ages (Dark → Feudal → Imperial)  — 🆕 **L** — ✅ done
 
 Research an age-up at the Town Center (food+gold, takes time). Each age gates
 buildings/units/tech and grants small global stat bumps. Most items below become
@@ -495,6 +495,16 @@ research; an age banner in the HUD; age-up command + cost.
 [sim.ts](packages/shared/src/sim.ts),
 [protocol.ts](packages/shared/src/protocol.ts),
 [Hud.tsx](packages/client/src/ui/Hud.tsx).
+**Status.** Shipped as **3 ages** (Dark/Feudal/Imperial) with **tiered unlocks
+that reshape the opening**: Dark = eco only; Feudal = barracks/tower/soldier/
+archer + combat upgrades; Imperial = siege workshop/ram. Advancing is issued at
+the Town Center, needs a **prerequisite building** (storehouse/farm → Feudal,
+barracks → Imperial) plus a food/gold cost and a timed bar. **Balanced bonuses**
+apply live via the stat helpers (+gather, +military damage, −damage taken, +pop
+headroom that also lifts the hard cap). `minAge` tags gate build/train/research
+in `applyCommand`; the HUD shows an age badge, an Advance-Age button + progress,
+and 🔒 hints on locked items. Covered by `scripts/ages.test.ts`; ratios re-pinned
+in `scripts/balance.test.ts`. Remaining §7 items now slot in as per-age unlocks.
 
 ### 7.2 Specialised drop-off camps (Lumber / Mining / Mill)  — 🔨 **M**
 

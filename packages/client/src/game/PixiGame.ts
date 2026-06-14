@@ -9,6 +9,7 @@ import {
   TICK_MS,
   UNIT_DEFS,
   base64ToBytes,
+  minAgeOfBuilding,
   rectContains,
   type AnimalDTO,
   type BuildingType,
@@ -190,6 +191,16 @@ export class PixiGame {
 
   // --- public API used by the HUD / minimap ---
   setPlacing(b: BuildingType | null): void {
+    // Age-gated: refuse to arm a building the player hasn't unlocked yet (the
+    // HUD also disables these, so this is a safety net for other callers).
+    if (b) {
+      const age = useStore.getState().curr?.me.age ?? 0;
+      if (age < minAgeOfBuilding(b)) {
+        sfx.error();
+        this.placing = null;
+        return;
+      }
+    }
     this.placing = b;
     this.wallDragStart = null;
     if (b) {
