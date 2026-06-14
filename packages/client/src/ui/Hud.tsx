@@ -316,9 +316,10 @@ function ControlsText() {
       selected, right-click/tap a <b>sheep or cow</b> to hunt it for food. Press{" "}
       <b>A</b> then click for attack-move; <b>.</b> cycles idle workers.
       <b> Ctrl+1–9</b> sets a control group, <b>1–9</b> recalls it (double-tap to centre). Select a
-      building, then right-click/tap to set its rally point. <b>Shift+click</b> queues orders
-      (move/gather/attack). Pick <b>Wall</b> (with a worker selected) and drag to build a line.
-      Arrow keys / drag to pan, wheel / pinch to zoom.
+      building, then right-click/tap to set its rally point. Right-click/tap a <b>damaged building</b>{" "}
+      with workers to repair it. <b>Shift+click</b> queues orders (move/gather/attack). Pick{" "}
+      <b>Wall</b> (with a worker selected) and drag to build a line. Arrow keys / drag to pan, wheel /
+      pinch to zoom.
       <br />
       <b>Touch:</b> tap <b>▣ Box select</b> then drag to marquee units; double-tap a unit to grab
       all of its type on screen; long-press to issue a command (e.g. send a worker to finish a
@@ -534,6 +535,13 @@ function BuildingPanel({
 
       {!built && (
         <div className="small muted">Under construction… {Math.round(building.progress * 100)}%</div>
+      )}
+
+      {built && building.hp < def.hp && (
+        <div className="small muted">
+          🔧 Damaged ({Math.round((building.hp / def.hp) * 100)}%). Select workers, then right-click /
+          tap here to repair.
+        </div>
       )}
 
       {built && def.canTrain.length > 0 && (

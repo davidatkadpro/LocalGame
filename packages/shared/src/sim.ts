@@ -66,6 +66,8 @@ const ARRIVE_EPS = 0.06;
 // hosted food node) still counts as in reach.
 const REACH_DIST = 1.5;
 const RETALIATE_TTL_MS = 4000; // how long an idle unit remembers who hit it
+const REPAIR_HP_PER_SEC = 20; // hp a worker restores per second when repairing
+const REPAIR_COST_RATIO = 0.5; // repairing 0 -> full costs half the build cost
 
 // ---------------------------------------------------------------- world setup
 
@@ -168,6 +170,28 @@ const animalById = (w: World, id: EntityId) => w.animals.find((a) => a.id === id
 function buildingCenter(b: Building): Vec2 {
   const d = BUILDING_DEFS[b.type].size;
   return { x: b.tile.x + d.w / 2, y: b.tile.y + d.h / 2 };
+}
+
+/** A building a worker can still work on: unfinished, or finished but damaged. */
+function buildingNeedsWork(b: Building): boolean {
+  return b.progress < 1 || b.hp < BUILDING_DEFS[b.type].hp;
+}
+
+/** Charge the proportional cost of repairing `heal` hp of `b`. Returns false if
+ *  the owner can't afford it (the repair should then stop). Repairing a building
+ *  from 0 to full costs REPAIR_COST_RATIO of its build cost. */
+function payRepair(world: World, b: Building, heal: number): boolean {
+  const def = BUILDING_DEFS[b.type];
+  const frac = (heal / def.hp) * REPAIR_COST_RATIO;
+  const wood = (def.cost.wood ?? 0) * frac;
+  const food = (def.cost.food ?? 0) * frac;
+  const gold = (def.cost.gold ?? 0) * frac;
+  const res = world.players[b.owner].resources;
+  if (res.wood < wood || res.food < food || res.gold < gold) return false;
+  res.wood -= wood;
+  res.food -= food;
+  res.gold -= gold;
+  return true;
 }
 
 function distToBuilding(pos: Vec2, b: Building): number {
@@ -328,10 +352,11 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
       break;
     }
     case "construct": {
-      // Send workers to (resume) constructing an existing, unfinished building —
-      // e.g. one whose original builder was re-tasked away.
+      // Send workers to (resume) constructing an unfinished building — or to
+      // repair a finished but damaged one. Both run through the build/repair
+      // state once the worker arrives.
       const b = buildingById(world, cmd.building);
-      if (!b || b.owner !== playerId || b.progress >= 1) break;
+      if (!b || b.owner !== playerId || !buildingNeedsWork(b)) break;
       for (const id of cmd.units) {
         const u = unitById(world, id);
         if (!u || u.owner !== playerId || u.type !== "worker") continue;
@@ -902,7 +927,7 @@ function tryEngageTarget(world: World, u: Unit): boolean {
     return false;
   }
   const b = buildingById(world, u.targetEntity);
-  if (b && b.owner === u.owner && b.progress < 1) {
+  if (b && b.owner === u.owner && buildingNeedsWork(b)) {
     if (distToBuilding(u.pos, b) <= REACH_DIST + 0.6) {
       u.state = "building";
       u.path = [];
@@ -1171,7 +1196,7 @@ function onArrive(world: World, u: Unit): void {
       return;
     }
     const b = buildingById(world, u.targetEntity);
-    if (b && b.owner === u.owner && b.progress < 1) {
+    if (b && b.owner === u.owner && buildingNeedsWork(b)) {
       u.state = "building";
       return;
     }
@@ -1253,8 +1278,8 @@ function tryDeposit(world: World, u: Unit): void {
 
 function doBuild(world: World, u: Unit): void {
   const b = u.targetEntity !== null ? buildingById(world, u.targetEntity) : null;
-  if (!b || b.progress >= 1) {
-    // Finished (by us or someone else) / gone. Chaining along a wall line keeps a
+  if (!b || !buildingNeedsWork(b)) {
+    // Whole (finished and undamaged) or gone. Chaining along a wall line keeps a
     // single worker building the whole run; otherwise go back to gathering.
     if (b && b.type === "wall" && chainToNextWall(world, u)) return;
     resumeGatherOrIdle(world, u);
@@ -1266,12 +1291,28 @@ function doBuild(world: World, u: Unit): void {
     return;
   }
   const def = BUILDING_DEFS[b.type];
-  b.progress = Math.min(1, b.progress + (TICK_DT * 1000) / def.buildMs);
-  b.hp = Math.max(b.hp, Math.floor(def.hp * (0.1 + 0.9 * b.progress)));
-  if (b.progress >= 1) {
+  if (b.progress < 1) {
+    // Construction: advance progress, scaling hp with it.
+    b.progress = Math.min(1, b.progress + (TICK_DT * 1000) / def.buildMs);
+    b.hp = Math.max(b.hp, Math.floor(def.hp * (0.1 + 0.9 * b.progress)));
+    if (b.progress >= 1) {
+      b.hp = def.hp;
+      onBuildingComplete(world, b);
+      if (b.type === "wall" && chainToNextWall(world, u)) return;
+      resumeGatherOrIdle(world, u);
+    }
+    return;
+  }
+  // Repair: a finished but damaged building. Restore hp over time, paying a
+  // proportional materials cost; stop if the owner can't afford it.
+  const heal = Math.min(REPAIR_HP_PER_SEC * TICK_DT, def.hp - b.hp);
+  if (!payRepair(world, b, heal)) {
+    resumeGatherOrIdle(world, u);
+    return;
+  }
+  b.hp = Math.min(def.hp, b.hp + heal);
+  if (b.hp >= def.hp) {
     b.hp = def.hp;
-    onBuildingComplete(world, b);
-    if (b.type === "wall" && chainToNextWall(world, u)) return;
     resumeGatherOrIdle(world, u);
   }
 }
@@ -1513,6 +1554,17 @@ function updateWinState(world: World): void {
     }
     // No buildings -> eliminated (the classic last-building-standing rule).
     if (!world.buildings.some((b) => b.owner === p.id)) {
+      p.alive = false;
+      continue;
+    }
+    // Town center destroyed and no workers left -> eliminated. Workers only come
+    // from the town center, so without either there's no way to rebuild an
+    // economy — an unrecoverable, sticky loss even if barracks/army remain.
+    const hasTownCenter = world.buildings.some(
+      (b) => b.owner === p.id && b.type === "town_center",
+    );
+    const hasWorker = world.units.some((u) => u.owner === p.id && u.type === "worker");
+    if (!hasTownCenter && !hasWorker) {
       p.alive = false;
       continue;
     }

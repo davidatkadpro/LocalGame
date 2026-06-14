@@ -519,5 +519,73 @@ function findOpenBlock(world: ReturnType<typeof createWorld>, size: number): { x
   check("demolishing a farm removes its hosted food node", !world.resourceNodes.some((n) => n.id === node.id));
 }
 
+// ---- 15. lose when the town center is destroyed and no workers remain ------
+{
+  const world = createWorld(7, PS);
+  const fog = createFog(world);
+  const proto = world.units.find((u) => u.owner === 0 && u.type === "worker")!;
+  // Player 1: town center gone, no workers, but a barracks + a soldier remain
+  // (so neither the no-buildings nor the economic-collapse rule is what fires).
+  world.buildings = world.buildings.filter((b) => !(b.owner === 1 && b.type === "town_center"));
+  world.units = world.units.filter((u) => u.owner !== 1);
+  world.buildings.push({
+    id: world.nextEntityId++, owner: 1, type: "barracks", tile: { x: 40, y: 40 },
+    hp: BUILDING_DEFS.barracks.hp, progress: 1, queue: [], produceTimer: 0,
+    rally: null, research: null, researchTimer: 0, attackCooldown: 0,
+  });
+  world.units.push({
+    ...proto, id: world.nextEntityId++, owner: 1, type: "soldier",
+    hp: UNIT_DEFS.soldier.hp, pos: { x: 41, y: 41 }, state: "idle", path: [], targetEntity: null,
+  });
+  tick(world, fog);
+  check("no town center + no workers eliminates the player", world.players[1].alive === false);
+  check("the survivor wins", world.winner === 0);
+}
+// ---- 15b. losing only the town center (keeping a worker) is survivable ------
+{
+  const world = createWorld(7, PS);
+  const fog = createFog(world);
+  world.buildings = world.buildings.filter((b) => !(b.owner === 1 && b.type === "town_center"));
+  world.buildings.push({
+    id: world.nextEntityId++, owner: 1, type: "barracks", tile: { x: 40, y: 40 },
+    hp: BUILDING_DEFS.barracks.hp, progress: 1, queue: [], produceTimer: 0,
+    rally: null, research: null, researchTimer: 0, attackCooldown: 0,
+  });
+  tick(world, fog);
+  check("player 1 still has a worker", world.units.some((u) => u.owner === 1 && u.type === "worker"));
+  check("no town center but a surviving worker is not an instant loss", world.players[1].alive === true);
+}
+
+// ---- 16. workers repair a damaged building ---------------------------------
+{
+  const world = createWorld(7, [PS[0]]);
+  const fog = createFog(world);
+  const worker = world.units.find((u) => u.owner === 0 && u.type === "worker")!;
+  const tc = world.buildings.find((b) => b.owner === 0 && b.type === "town_center")!;
+  tc.hp = 400; // damaged (max 1200)
+  const hp0 = tc.hp;
+  worker.pos = { x: tc.tile.x - 1, y: tc.tile.y + 1 }; // right beside the TC
+  world.units = [worker];
+  const woodBefore = world.players[0].resources.wood;
+  applyCommand(world, 0, { c: "construct", units: [worker.id], building: tc.id });
+  for (let i = 0; i < 60; i++) tick(world, fog);
+  check("repairing raises the building's hp", tc.hp > hp0, `hp ${hp0} -> ${tc.hp}`);
+  check("repair consumes materials", world.players[0].resources.wood < woodBefore);
+}
+// ---- 16b. repair stops at full hp (doesn't overheal) -----------------------
+{
+  const world = createWorld(7, [PS[0]]);
+  const fog = createFog(world);
+  const worker = world.units.find((u) => u.owner === 0 && u.type === "worker")!;
+  const tc = world.buildings.find((b) => b.owner === 0 && b.type === "town_center")!;
+  tc.hp = BUILDING_DEFS.town_center.hp - 30; // barely damaged
+  worker.pos = { x: tc.tile.x - 1, y: tc.tile.y + 1 };
+  world.units = [worker];
+  applyCommand(world, 0, { c: "construct", units: [worker.id], building: tc.id });
+  for (let i = 0; i < 80; i++) tick(world, fog);
+  check("repair tops out at max hp", tc.hp === BUILDING_DEFS.town_center.hp, `hp=${tc.hp}`);
+  check("the worker stops repairing once whole", worker.state !== "building");
+}
+
 console.log(pass ? "M3: PASS ✅" : "M3: FAIL ❌");
 process.exit(pass ? 0 : 1);

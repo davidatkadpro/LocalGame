@@ -1264,9 +1264,13 @@ export class PixiGame {
     if (ownB !== null) {
       const b = snap?.buildings.find((x) => x.id === ownB);
       // Tapping a "work site" with workers selected assigns them rather than
-      // reselecting the building: a foundation -> construct it; a finished farm
-      // -> gather its hosted food node. Otherwise just (re)select the building.
-      const isWorkSite = b && (b.progress < 1 || (b.type === "farm" && b.progress >= 1));
+      // reselecting the building: a foundation -> construct it; a damaged
+      // building -> repair it; a finished farm -> gather its hosted food node.
+      // Otherwise just (re)select the building.
+      const def = b ? BUILDING_DEFS[b.type as BuildingType] : null;
+      const isWorkSite =
+        !!b &&
+        (b.progress < 1 || (b.type === "farm" && b.progress >= 1) || (!!def && b.hp < def.hp));
       if (isWorkSite && this.selectionHasWorker()) {
         this.issueCommandAt(wp);
         return;
@@ -1353,14 +1357,12 @@ export class PixiGame {
         return this.send({ c: "attack", units: workers, target: a.id, queue });
       }
     }
-    // friendly building still under construction? -> send workers to finish it.
+    // friendly building that needs work — unfinished (finish it) or damaged
+    // (repair it)? -> send workers. Both go through the `construct` command.
     for (const b of snap.buildings) {
       const def = BUILDING_DEFS[b.type as BuildingType];
-      if (
-        b.owner === this.me() &&
-        b.progress < 1 &&
-        rectContains(b.tx, b.ty, def.size.w, def.size.h, tx, ty)
-      ) {
+      const needsWork = b.progress < 1 || b.hp < def.hp;
+      if (b.owner === this.me() && needsWork && rectContains(b.tx, b.ty, def.size.w, def.size.h, tx, ty)) {
         const workers = units.filter((id) => snap.units.find((u) => u.id === id)?.type === "worker");
         if (workers.length > 0) {
           sfx.command();
