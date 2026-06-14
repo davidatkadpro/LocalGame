@@ -133,6 +133,23 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
     }
   }
 
+  // A rich gold deposit in the dead centre of the map — a contested prize that
+  // pulls players to fight over the middle instead of mining only their corner.
+  {
+    const gx = Math.floor(width / 2);
+    const gy = Math.floor(height / 2);
+    const r = 3;
+    for (let y = gy - r; y <= gy + r; y++) {
+      for (let x = gx - r; x <= gx + r; x++) {
+        const dx = x - gx;
+        const dy = y - gy;
+        if (dx * dx + dy * dy > r * r) continue;
+        if (rng.next() < 0.45) continue; // a scattered patch, not a solid slab
+        placeNode(x, y, "gold");
+      }
+    }
+  }
+
   // A handful of dense "resource sites" — clusters worth expanding to and
   // fighting over, rather than uniform scatter. Each is a single kind so a site
   // reads as "the gold patch", "the woods", etc.

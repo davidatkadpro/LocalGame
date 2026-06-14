@@ -20,6 +20,14 @@ for (const seed of [1, 7, 11, 42]) {
   const wood = world.resourceNodes.filter((n) => n.kind === "wood").length;
   check(`seed ${seed}: densely wooded map`, wood >= 70, `wood=${wood}`);
 
+  // A contested gold deposit sits in the middle of the map.
+  const cx = world.map.width / 2;
+  const cy = world.map.height / 2;
+  const centreGold = world.resourceNodes.filter(
+    (n) => n.kind === "gold" && Math.hypot(n.tile.x - cx, n.tile.y - cy) <= 5,
+  ).length;
+  check(`seed ${seed}: gold deposit in the map centre`, centreGold >= 4, `centreGold=${centreGold}`);
+
   let overlap = false;
   const d = BUILDING_DEFS.town_center.size;
   for (const b of world.buildings) {
