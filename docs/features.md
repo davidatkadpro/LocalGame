@@ -458,3 +458,257 @@ point target a resource node** so newly-trained workers auto-gather.
 
 Each item is independently shippable; nothing here blocks on the packaged
 desktop host still tracked in [PLAN.md](docs/PLAN.md).
+
+---
+
+## 7. Roadmap — AoE-direction expansion (new features tracker)
+
+Forward-looking ideas to grow the game toward the Age-of-Empires feel. Unlike
+§1–6 (mostly shipped), these are **not started** unless marked otherwise. Status
+legend: 🆕 brand new · 🔨 expand something we already have · ✅ shipped.
+
+**Where we are today (baseline).** Worth knowing before expanding:
+
+- **Units:** `worker`, `soldier`, `archer`, `ram` (siege). Counters with
+  building bonuses live in [COUNTERS](packages/shared/src/constants.ts#L297)
+  (ram ×5 vs buildings, archer bonus vs infantry, etc.).
+- **Buildings:** `town_center`, `house`, `barracks`, `tower`, `storehouse`
+  (drop-off), `farm`, `wall`, `siege_workshop`.
+- **Resources:** `wood`, `food`, `gold` (3). Food from bushes, farms, and hunted
+  animals (sheep/cow → meat carcass).
+- **Tech:** a working research system with three flat upgrades —
+  `improvedTools`, `sharpenedBlades`, `paddedArmor`
+  ([UpgradeId](packages/shared/src/types.ts#L23)).
+- **Systems:** fog/teams, leaderboard, repair/demolish, under-attack alerts +
+  minimap pings (§5.2 ✅), stop/H/double-click QoL, resource-depletion visuals.
+
+### 7.1 Ages (Dark → Feudal → Castle → Imperial)  — 🆕 **L** — *the spine*
+
+Research an age-up at the Town Center (food+gold, takes time). Each age gates
+buildings/units/tech and grants small global stat bumps. Most items below become
+"things you unlock per age," so this is the highest-leverage single feature.
+
+**Add.** Per-player `age` + a research/timer state; age-gates on build/train/
+research; an age banner in the HUD; age-up command + cost.
+**Files.** [types.ts](packages/shared/src/types.ts),
+[constants.ts](packages/shared/src/constants.ts),
+[sim.ts](packages/shared/src/sim.ts),
+[protocol.ts](packages/shared/src/protocol.ts),
+[Hud.tsx](packages/client/src/ui/Hud.tsx).
+
+### 7.2 Specialised drop-off camps (Lumber / Mining / Mill)  — 🔨 **M**
+
+**Have today.** One generic `storehouse` drop-off; gather loop already routes to
+the nearest drop-off ([nearestDropOff](packages/shared/src/sim.ts#L156)).
+**Add.** Resource-specific camps that also grant a small gather-rate bonus for
+their resource, so placement is a real eco decision (AoE's Lumber/Mining Camp +
+Mill). Reuses the drop-off routing; mostly new building defs + a per-kind bonus
+in the gather tick.
+**Files.** [constants.ts](packages/shared/src/constants.ts),
+[sim.ts](packages/shared/src/sim.ts), assets, [Hud.tsx](packages/client/src/ui/Hud.tsx).
+
+### 7.3 Blacksmith + tiered tech tree  — 🔨 **M**
+
+**Have today.** Three flat upgrades researched (likely at the TC).
+**Add.** A dedicated **Blacksmith** building and a *tiered*, age-gated tree
+(attack I/II/III, armor I/II/III, plus economy techs: faster gather, +farm
+yield, +worker carry). Generalises the existing `UpgradeId` enum + research
+command into levelled lines.
+**Files.** [types.ts](packages/shared/src/types.ts) (`UpgradeId` lines),
+[constants.ts](packages/shared/src/constants.ts),
+[sim.ts](packages/shared/src/sim.ts), [Hud.tsx](packages/client/src/ui/Hud.tsx).
+
+### 7.4 Stone as a 4th resource  — 🆕 **M**
+
+Split a hard resource out for defensive structures: **stone** for walls / towers
+/ TC, **gold** stays for units & tech. Gives a concrete reason to fight over the
+map center. Touches `ResourceKind`, the HUD top bar, node generation, and
+building costs.
+**Files.** [types.ts](packages/shared/src/types.ts),
+[constants.ts](packages/shared/src/constants.ts),
+[map.ts](packages/shared/src/map.ts), [Hud.tsx](packages/client/src/ui/Hud.tsx).
+
+### 7.5 Town Center fires arrows + Garrison  — 🔨 **M**
+
+**Have today.** Towers auto-attack visible enemies in range.
+**Add.** (a) Give the **TC** the same building-weapon loop so a base bites back;
+(b) **garrison** — units/villagers shelter inside TC/tower, garrisoned archers
+add arrows, villagers pop out on command. Classic AoE raid-survival layer.
+**Files.** [sim.ts](packages/shared/src/sim.ts) (building-attack + garrison
+list), [constants.ts](packages/shared/src/constants.ts),
+[Hud.tsx](packages/client/src/ui/Hud.tsx) (eject button).
+
+### 7.6 Walls → Gates, auto-connect, and tiers  — 🔨 **M**
+
+**Have today.** 1×1 `wall` with drag-to-place a line (§3.2 ✅).
+**Add.** A **gate** that only friendly units pass; auto-connecting straight/
+corner/end sprites; palisade→stone→fortified wall tiers (pairs with 7.4 stone).
+Gate pass-through is the only real sim work (per-tile owner-aware passability).
+**Files.** [PixiGame.ts](packages/client/src/game/PixiGame.ts) (sprite
+selection), [sim.ts](packages/shared/src/sim.ts) (gate passability), assets.
+
+### 7.7 Siege expansion: mangonel & trebuchet  — 🔨 **M**
+
+**Have today.** `ram` (×5 vs buildings) trained at `siege_workshop`; near-
+useless vs units, needs an escort.
+**Add.** A **mangonel/catapult** (area damage vs unit clumps — counters massed
+archers) and a **trebuchet** (very long range, anti-building, slow). Reuses the
+siege workshop and the COUNTERS table; new bit is area-of-effect damage.
+**Files.** [constants.ts](packages/shared/src/constants.ts) (defs + counters),
+[sim.ts](packages/shared/src/sim.ts) (AoE damage), assets,
+[Hud.tsx](packages/client/src/ui/Hud.tsx).
+
+### 7.8 Cavalry (Stable)  — 🆕 **M**
+
+A fast raider (scout/knight) from a new **Stable** — built to run down workers
+and harass eco, weak to spear/infantry. Extends the counter triangle and gives
+map presence. Mostly a unit def + building + counter entries + sprite.
+**Files.** [types.ts](packages/shared/src/types.ts) (`UnitType`),
+[constants.ts](packages/shared/src/constants.ts),
+[sim.ts](packages/shared/src/sim.ts), assets, [Hud.tsx](packages/client/src/ui/Hud.tsx).
+
+### 7.9 Unit stances + patrol  — 🔨 **M**
+
+**Have today.** Formation moves/stop and idle auto-retaliation (§1.1, §1.4 ✅).
+**Add.** Per-unit **stance** (Aggressive / Defensive / Stand-Ground / No-Attack)
+that bounds chase distance and hold behaviour, plus a **patrol** command (loop
+between waypoints). The difference between army micro and chaos.
+**Files.** [types.ts](packages/shared/src/types.ts) (stance enum),
+[sim.ts](packages/shared/src/sim.ts) (chase leash + patrol),
+[protocol.ts](packages/shared/src/protocol.ts),
+[Hud.tsx](packages/client/src/ui/Hud.tsx) (4 toggles + patrol button).
+
+### 7.10 Map objectives — Relics & a Wonder victory  — 🆕 **L**
+
+A non-annihilation win path: capturable **relics/monuments** that trickle gold
+to the holder, and/or a **Wonder** building that wins if it survives a countdown.
+Gives team games a comeback/objective layer beyond last-base-standing.
+**Files.** [map.ts](packages/shared/src/map.ts) (objective placement),
+[sim.ts](packages/shared/src/sim.ts) (capture + `updateWinState`),
+[protocol.ts](packages/shared/src/protocol.ts),
+[Hud.tsx](packages/client/src/ui/Hud.tsx).
+
+### Already shipped from this brainstorm
+
+- **Under-attack alerts + minimap pings** — ✅ done, see §5.2.
+
+### Suggested sequencing (roadmap)
+
+1. **Highest leverage:** 7.1 Ages — once in, 7.3/7.6/7.7/7.8 slot in as per-age
+   unlocks for far less marginal effort.
+2. **Cheap, high-feel:** 7.5a (TC fires arrows) and 7.6 gates — small, very
+   noticeable on defense.
+3. **Depth:** 7.4 stone → unlocks meaningful 7.6 wall tiers and map-center
+   contention; 7.2 specialised camps for eco decisions.
+4. **Army identity:** 7.8 cavalry, 7.7 siege types, 7.9 stances together turn
+   combat from blob-vs-blob into composition + micro.
+5. **Endgame variety:** 7.10 objectives/Wonder for non-annihilation wins.
+
+---
+
+## 8. Refinements — polish on existing systems
+
+Not new systems — these tighten the *feel, readability, and robustness* of what
+we already have. Same status legend (🆕/🔨/✅).
+
+**Already refined (don't re-suggest).** Controls are mature: zoom (wheel +
+pinch), control groups (Ctrl+digit / digit recall), shift-queued orders, rally
+points, attack-move, stop, idle-worker cycle (`.`), go-to-TC (`H`), double-click
+select-by-type, a selection-summary-by-type panel, affordability cues + cost
+badges, under-attack minimap pings, resource-depletion visuals.
+
+### 8.1 Projectiles & impact  — 🆕 **S–M** — *top pick, client-only* — *the biggest feel gap*
+
+Today archers, towers, and rams deal damage **instantly** with only a flash on
+the target — nothing flies. Add arrow arcs from archers/towers, a ram impact
+thud + dust, and small hit-sparks. Purely cosmetic (derived from the snapshot
+stream), so it's **deterministic-safe** — no sim change.
+**Files.** [PixiGame.ts](packages/client/src/game/PixiGame.ts),
+[audio.ts](packages/client/src/game/audio.ts).
+
+### 8.2 On-map unit-state clarity  — 🆕 **S**
+
+A subtle pulsing ring on **idle workers**, a red outline on **low-HP** units, and
+a gather/return indicator. We can already *cycle* idle workers but can't *see*
+them on the field. Client-only.
+**Files.** [PixiGame.ts](packages/client/src/game/PixiGame.ts).
+
+### 8.3 Income rate + villager allocation readout  — 🔨 **S–M**
+
+No per-second income exists anywhere. Add a compact "🪵+12/s · 🍖+8/s · 🪙+4/s"
+line and/or a villager-allocation count ("6 wood · 3 food · 2 gold · 2 idle").
+Turns the eco game from guesswork into management.
+**Files.** [store.ts](packages/client/src/net/store.ts) (derived tally),
+[Hud.tsx](packages/client/src/ui/Hud.tsx).
+
+### 8.4 Sub-select & cancel from the panels  — 🔨 **S**
+
+The selection panel already groups by type — make clicking a type group **narrow
+the selection to just that type** (AoE idiom), and make production-queue slots
+**cancel-and-refund on click**. Tightens micro, no new systems.
+**Files.** [Hud.tsx](packages/client/src/ui/Hud.tsx),
+[PixiGame.ts](packages/client/src/game/PixiGame.ts),
+[sim.ts](packages/shared/src/sim.ts) (queue cancel + refund).
+
+### 8.5 Click an alert to jump there  — 🔨 **S**
+
+Under-attack pings exist; make clicking a ping (or pressing `Space`) snap the
+camera to the most recent alert. Closes the loop on the alert system.
+**Files.** [Minimap.tsx](packages/client/src/ui/Minimap.tsx),
+[PixiGame.ts](packages/client/src/game/PixiGame.ts).
+
+### 8.6 Smooth camera + follow-selected  — 🆕 **S**
+
+Lerp camera moves (control-group recall and go-to-TC currently hard-snap), and a
+"follow selection" toggle. Cheap; makes the whole game feel less rigid.
+**Files.** [PixiGame.ts](packages/client/src/game/PixiGame.ts).
+
+### 8.7 Pacing / balance pass  — 🔨 **M** — *a deliverable in itself*
+
+Tune starting eco, train times, pop-house pacing, and unit costs **as a set** for
+a clean ~15-min match arc. Pure data, validated against the sim suite. Best done
+**once the unit roster from §7 is stable** (ages/cavalry/siege all shift the
+numbers).
+**Files.** [constants.ts](packages/shared/src/constants.ts), sim tests.
+
+### 8.8 Reconnect / pause for LAN play  — 🆕 **M**
+
+A host pause and clean rejoin-after-disconnect (resync from the latest snapshot)
+so a dropped phone at a couch/LAN session doesn't end someone's game.
+**Files.** [room.ts](packages/server/src/room.ts),
+[index.ts](packages/server/src/index.ts),
+[connection.ts](packages/client/src/net/connection.ts),
+[protocol.ts](packages/shared/src/protocol.ts).
+
+### 8.9 Mobile refinement pass  — 🔨 **M** — *do LAST, after all §7 features land*
+
+Every new feature in §7 adds HUD/controls that need a touch treatment, so a
+holistic mobile pass only pays off **once the feature set is complete** — doing
+it earlier means redoing it. Scope when we get there:
+
+- **Touch UI for every new system** — age-up, stances, garrison eject, gates,
+  research tiers, etc. each need a reachable tap target, not just a desktop
+  hotkey.
+- **Layout for the grown HUD** — the build/train/research lists get long; needs
+  scrollable/collapsible mobile panels and larger hit targets (thumb-sized).
+- **Gesture consistency** — keep pan / box-select / long-press-command coherent
+  as commands multiply; audit against the §3.3 select-mode toggle.
+- **Performance on phones** — verify the projectile/particle work (8.1) and
+  larger armies hold frame rate on mid-range devices; add a quality toggle if
+  needed.
+- **Readability at small size** — income readout (8.3), alerts (8.5), and
+  unit-state cues (8.2) must stay legible on a phone.
+
+**Files.** [Hud.tsx](packages/client/src/ui/Hud.tsx),
+[styles.css](packages/client/src/ui/styles.css),
+[PixiGame.ts](packages/client/src/game/PixiGame.ts),
+[useIsMobile.ts](packages/client/src/ui/useIsMobile.ts).
+
+### Suggested sequencing (refinements)
+
+1. **Now, cheap & high-feel:** 8.1 projectiles, 8.2 unit-state cues, 8.5
+   alert-jump, 8.6 smooth camera — all small, client-only, immediately felt.
+2. **Eco depth:** 8.3 income readout, 8.4 sub-select/queue-cancel.
+3. **Reliability:** 8.8 reconnect/pause when LAN sessions get serious.
+4. **After §7 lands:** 8.7 balance pass, then 8.9 the mobile refinement pass —
+   both want a stable feature set first.
