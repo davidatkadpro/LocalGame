@@ -994,7 +994,7 @@ function tickTowers(world: World): void {
     for (const u of world.units) {
       if (sameTeam(world, u.owner, b.owner) || u.hp <= 0) continue;
       const d = distToBuilding(u.pos, b);
-      if (d <= bestD) {
+      if (d < bestD) {
         bestD = d;
         target = u;
       }
@@ -1734,7 +1734,7 @@ function tryStandGround(world: World, u: Unit): void {
   for (const e of world.units) {
     if (e.id === u.id || e.hp <= 0 || sameTeam(world, e.owner, u.owner)) continue;
     const d = dist(u.pos, e.pos);
-    if (d <= bd) {
+    if (d < bd) {
       bd = d;
       best = e.id;
     }
