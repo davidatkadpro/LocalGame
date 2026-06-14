@@ -119,6 +119,12 @@ export interface Snapshot {
     pop: number;
     popCap: number;
     upgrades: UpgradeId[];
+    /** current age (0 = Dark, 1 = Feudal, 2 = Imperial) */
+    age: number;
+    /** ms left on an in-progress age advance (0 = not advancing) */
+    ageUpTimer: number;
+    /** total ms of the in-progress advance (for a progress bar; 0 if idle) */
+    ageUpMs: number;
     /** false once this player has been eliminated (they spectate from then on) */
     alive: boolean;
   };
@@ -141,6 +147,7 @@ export type Command =
   | { c: "train"; building: number; unit: UnitType }
   | { c: "cancelTrain"; building: number; index?: number }
   | { c: "research"; building: number; upgrade: UpgradeId }
+  | { c: "advanceAge"; building: number }
   | { c: "rally"; building: number; tile: Vec2 }
   | { c: "attack"; units: number[]; target: number; queue?: boolean }
   | { c: "attackMove"; units: number[]; tile: Vec2; queue?: boolean }

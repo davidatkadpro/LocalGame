@@ -2,6 +2,8 @@
 // The server owns the only real World; clients receive fog-filtered snapshots.
 
 import {
+  AGE_DEFS,
+  AGE_POP_BONUS,
   ANIMAL_DEFS,
   BASE_POP_CAP,
   BUILDING_DEFS,
@@ -16,6 +18,10 @@ import {
   emptyResources,
   gatherRate,
   incomingDamage,
+  minAgeOfBuilding,
+  minAgeOfUnit,
+  minAgeOfUpgrade,
+  nextAge,
   payCost,
   unitDamage,
 } from "./constants";
@@ -105,6 +111,8 @@ export function createWorld(seed: number, playerSeeds: PlayerSeed[]): World {
       alive: true,
       conceded: false,
       upgrades: [],
+      age: 0,
+      ageUpTimer: 0,
     });
     const spawn = gen.spawns[i];
     // Town center
@@ -327,6 +335,7 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
     case "build": {
       const u = unitById(world, cmd.unit);
       if (!u || u.owner !== playerId || u.type !== "worker") break;
+      if (player.age < minAgeOfBuilding(cmd.building)) break; // age-gated
       const def = BUILDING_DEFS[cmd.building];
       if (!placementValid(world, cmd.building, cmd.tile)) break;
       if (!canAfford(player.resources, def.cost)) break;
@@ -373,6 +382,7 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
       if (!b || b.owner !== playerId || b.progress < 1) break;
       const bdef = BUILDING_DEFS[b.type];
       if (!bdef.canTrain.includes(cmd.unit)) break;
+      if (player.age < minAgeOfUnit(cmd.unit)) break; // age-gated
       const udef = UNIT_DEFS[cmd.unit];
       if (!canAfford(player.resources, udef.cost)) break;
       if (player.pop + countQueued(player, world) + udef.popCost > player.popCap) break;
@@ -403,6 +413,7 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
       if (b.research !== null) break; // already researching here
       const udef = UPGRADE_DEFS[cmd.upgrade];
       if (!udef || udef.building !== b.type) break;
+      if (player.age < minAgeOfUpgrade(cmd.upgrade)) break; // age-gated
       if (player.upgrades.includes(cmd.upgrade)) break; // already have it
       // not already being researched elsewhere
       if (world.buildings.some((x) => x.owner === playerId && x.research === cmd.upgrade)) break;
@@ -410,6 +421,24 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
       payCost(player.resources, udef.cost);
       b.research = cmd.upgrade;
       b.researchTimer = udef.researchMs;
+      break;
+    }
+    case "advanceAge": {
+      const b = buildingById(world, cmd.building);
+      // Advance is issued at a completed town center.
+      if (!b || b.owner !== playerId || b.type !== "town_center" || b.progress < 1) break;
+      if (player.ageUpTimer > 0) break; // already advancing
+      const next = nextAge(player.age);
+      if (next === null) break; // already at the max age
+      const adef = AGE_DEFS[next];
+      // Need a completed prerequisite building of an accepted type.
+      const hasPrereq = world.buildings.some(
+        (x) => x.owner === playerId && x.progress >= 1 && adef.prereq.includes(x.type),
+      );
+      if (!hasPrereq) break;
+      if (!canAfford(player.resources, adef.advanceCost)) break;
+      payCost(player.resources, adef.advanceCost);
+      player.ageUpTimer = adef.advanceMs;
       break;
     }
     case "rally": {
@@ -755,6 +784,16 @@ export function tick(world: World, fog: Fog): void {
       if (p && !p.upgrades.includes(b.research)) p.upgrades.push(b.research);
       b.research = null;
       b.researchTimer = 0;
+    }
+  }
+
+  // age advancement: count down each player's age-up timer, then bump the age
+  for (const p of world.players) {
+    if (p.ageUpTimer <= 0) continue;
+    p.ageUpTimer -= TICK_DT * 1000;
+    if (p.ageUpTimer <= 0) {
+      p.ageUpTimer = 0;
+      if (nextAge(p.age) !== null) p.age += 1;
     }
   }
 
@@ -1539,12 +1578,14 @@ function distToTile(pos: Vec2, tile: Vec2): number {
 function recomputePop(world: World): void {
   for (const p of world.players) {
     p.pop = 0;
-    let cap = BASE_POP_CAP;
+    const ageBonus = AGE_POP_BONUS[p.age] ?? 0;
+    let cap = BASE_POP_CAP + ageBonus;
     for (const u of world.units) if (u.owner === p.id) p.pop += UNIT_DEFS[u.type].popCost;
     for (const b of world.buildings) {
       if (b.owner === p.id && b.progress >= 1) cap += BUILDING_DEFS[b.type].providesPop;
     }
-    p.popCap = Math.min(HARD_POP_CAP, cap);
+    // Higher ages also raise the hard ceiling so late armies can exceed 50.
+    p.popCap = Math.min(HARD_POP_CAP + ageBonus, cap);
     if (world.stats[p.id]) world.stats[p.id].peakPop = Math.max(world.stats[p.id].peakPop, p.pop);
   }
 }
@@ -1742,6 +1783,10 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
       pop: me ? me.pop : 0,
       popCap: me ? me.popCap : 0,
       upgrades: me ? me.upgrades.slice() : [],
+      age: me ? me.age : 0,
+      ageUpTimer: me ? me.ageUpTimer : 0,
+      // total advance time of the age being researched, for a progress bar
+      ageUpMs: me && me.ageUpTimer > 0 ? AGE_DEFS[me.age + 1]?.advanceMs ?? 0 : 0,
       alive: me ? me.alive : false,
     },
     players: world.players.map((p) => ({ id: p.id, alive: p.alive })),

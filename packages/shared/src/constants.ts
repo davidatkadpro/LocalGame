@@ -40,6 +40,8 @@ export interface UnitDef {
   range: number; // tiles
   attackMs: number; // cooldown between attacks
   trainedAt: BuildingType;
+  /** earliest age this unit can be trained (0 = Dark, 1 = Feudal, 2 = Imperial) */
+  minAge?: number;
 }
 
 export const UNIT_DEFS: Record<UnitType, UnitDef> = {
@@ -68,6 +70,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     range: 0.8,
     attackMs: 1000,
     trainedAt: "barracks",
+    minAge: 1, // Feudal
   },
   archer: {
     type: "archer",
@@ -81,6 +84,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     range: 5, // ranged: attacks from a distance
     attackMs: 1400,
     trainedAt: "barracks",
+    minAge: 1, // Feudal
   },
   ram: {
     type: "ram",
@@ -94,6 +98,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     range: 0.9,
     attackMs: 2000,
     trainedAt: "siege_workshop",
+    minAge: 2, // Imperial
   },
 };
 
@@ -118,6 +123,8 @@ export interface BuildingDef {
   farm?: { capacity: number; regenPerSec: number };
   /** can a worker construct this from the build menu */
   buildable: boolean;
+  /** earliest age this building can be built (0 = Dark, 1 = Feudal, 2 = Imperial) */
+  minAge?: number;
 }
 
 export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
@@ -160,6 +167,7 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     canTrain: ["soldier", "archer"],
     research: ["sharpenedBlades", "paddedArmor"],
     buildable: true,
+    minAge: 1, // Feudal
   },
   tower: {
     type: "tower",
@@ -175,6 +183,7 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     // soldiers). Now trades evenly with massed ranged units.
     attack: { damage: 10, range: 5, attackMs: 1000 },
     buildable: true,
+    minAge: 1, // Feudal
   },
   storehouse: {
     type: "storehouse",
@@ -226,6 +235,7 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     isDropOff: false,
     canTrain: ["ram"], // gates siege behind a dedicated tech building
     buildable: true,
+    minAge: 2, // Imperial
   },
 };
 
@@ -236,6 +246,8 @@ export interface UpgradeDef {
   cost: Partial<Resources>;
   researchMs: number;
   building: BuildingType;
+  /** earliest age this upgrade can be researched (0 = Dark, 1 = Feudal, 2 = Imperial) */
+  minAge?: number;
 }
 
 export const UPGRADE_DEFS: Record<UpgradeId, UpgradeDef> = {
@@ -254,6 +266,7 @@ export const UPGRADE_DEFS: Record<UpgradeId, UpgradeDef> = {
     cost: { food: 150, gold: 100 },
     researchMs: 25000,
     building: "barracks",
+    minAge: 1, // Feudal (its building is too)
   },
   paddedArmor: {
     id: "paddedArmor",
@@ -262,28 +275,85 @@ export const UPGRADE_DEFS: Record<UpgradeId, UpgradeDef> = {
     cost: { wood: 150, gold: 100 },
     researchMs: 25000,
     building: "barracks",
+    minAge: 1, // Feudal
   },
 };
 
-// ---- effective stats (apply per-player upgrades) ----
+// ---- Ages (Dark -> Feudal -> Imperial) ----
+
+export const MAX_AGE = 2; // 0 = Dark, 1 = Feudal, 2 = Imperial
+
+export interface AgeDef {
+  /** display name of THIS age */
+  name: string;
+  /** cost to advance INTO this age (index 0 is the starting age — unused) */
+  advanceCost: Partial<Resources>;
+  /** time to advance into this age, ms */
+  advanceMs: number;
+  /** at least one completed building of one of these types is required to advance */
+  prereq: BuildingType[];
+}
+
+export const AGE_DEFS: AgeDef[] = [
+  { name: "Dark Age", advanceCost: {}, advanceMs: 0, prereq: [] },
+  {
+    name: "Feudal Age",
+    advanceCost: { food: 400, gold: 150 },
+    advanceMs: 30000,
+    prereq: ["storehouse", "farm"], // an established economy
+  },
+  {
+    name: "Imperial Age",
+    advanceCost: { food: 600, gold: 350 },
+    advanceMs: 45000,
+    prereq: ["barracks"], // an established military
+  },
+];
+
+// Cumulative per-age bonuses, indexed by age. Applied live in the stat helpers
+// below, so an age-up takes effect on every existing unit immediately.
+export const AGE_GATHER_MULT = [1.0, 1.15, 1.3]; // economy-wide
+export const AGE_DAMAGE_MULT = [1.0, 1.1, 1.2]; // military damage dealt
+export const AGE_ARMOR_MULT = [1.0, 0.9, 0.85]; // military damage taken
+export const AGE_POP_BONUS = [0, 10, 25]; // extra pop headroom
+
+export function nextAge(age: number): number | null {
+  return age < MAX_AGE ? age + 1 : null;
+}
+
+export function minAgeOfUnit(type: UnitType): number {
+  return UNIT_DEFS[type].minAge ?? 0;
+}
+export function minAgeOfBuilding(type: BuildingType): number {
+  return BUILDING_DEFS[type].minAge ?? 0;
+}
+export function minAgeOfUpgrade(id: UpgradeId): number {
+  return UPGRADE_DEFS[id].minAge ?? 0;
+}
+
+// ---- effective stats (apply per-player upgrades + age) ----
 
 export function hasUpgrade(p: Player, id: UpgradeId): boolean {
   return p.upgrades.includes(id);
 }
 
 export function gatherRate(p: Player): number {
-  return GATHER_PER_SEC * (hasUpgrade(p, "improvedTools") ? 1.5 : 1);
+  return GATHER_PER_SEC * (hasUpgrade(p, "improvedTools") ? 1.5 : 1) * AGE_GATHER_MULT[p.age ?? 0];
 }
 
 /** Damage a unit of `type` owned by `p` deals (before target armor). */
 export function unitDamage(p: Player, type: UnitType): number {
   const base = UNIT_DEFS[type].damage;
-  return MILITARY.includes(type) && hasUpgrade(p, "sharpenedBlades") ? base * 1.25 : base;
+  if (!MILITARY.includes(type)) return base;
+  const blades = hasUpgrade(p, "sharpenedBlades") ? 1.25 : 1;
+  return base * blades * AGE_DAMAGE_MULT[p.age ?? 0];
 }
 
 /** Damage actually taken by a unit of `type` owned by `target`, after armor. */
 export function incomingDamage(target: Player, type: UnitType, dmg: number): number {
-  return MILITARY.includes(type) && hasUpgrade(target, "paddedArmor") ? dmg * 0.75 : dmg;
+  if (!MILITARY.includes(type)) return dmg;
+  const armor = hasUpgrade(target, "paddedArmor") ? 0.75 : 1;
+  return dmg * armor * AGE_ARMOR_MULT[target.age ?? 0];
 }
 
 /**

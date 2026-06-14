@@ -149,6 +149,10 @@ export interface Player {
   conceded: boolean;
   /** researched upgrades */
   upgrades: UpgradeId[];
+  /** current age (0 = Dark, 1 = Feudal, 2 = Imperial); gates buildings/units */
+  age: number;
+  /** ms remaining on an in-progress age advance (0 = not advancing) */
+  ageUpTimer: number;
 }
 
 /** Cumulative per-player match stats, surfaced on the post-game scoreboard. */

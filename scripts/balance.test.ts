@@ -22,8 +22,9 @@ function check(label: string, cond: boolean, detail = "") {
   if (!cond) pass = false;
 }
 
-// Minimal players — the upgrade helpers only read `p.upgrades`.
-const P = (...upgrades: string[]) => ({ upgrades }) as unknown as Player;
+// Minimal players — the helpers read `p.upgrades` and `p.age`.
+const P = (...upgrades: string[]) => ({ upgrades, age: 0 }) as unknown as Player;
+const PA = (age: number) => ({ upgrades: [], age }) as unknown as Player;
 const noUp = P();
 
 // Per-hit damage an attacker deals to a target category (incl. counters).
@@ -114,6 +115,18 @@ check(
   "house builds no slower than a storehouse (pop curve)",
   BUILDING_DEFS.house.buildMs <= BUILDING_DEFS.storehouse.buildMs,
   `house=${BUILDING_DEFS.house.buildMs} store=${BUILDING_DEFS.storehouse.buildMs}`,
+);
+
+// ---- 7. ages scale eco + military upward (detail in scripts/ages.test.ts) --
+check(
+  "each age raises gather rate and military power",
+  gatherRate(PA(1)) > gatherRate(PA(0)) &&
+    gatherRate(PA(2)) > gatherRate(PA(1)) &&
+    unitDamage(PA(2), "soldier") > unitDamage(PA(1), "soldier"),
+);
+check(
+  "higher ages reduce military damage taken",
+  incomingDamage(PA(2), "soldier", 100) < incomingDamage(PA(0), "soldier", 100),
 );
 
 console.log(pass ? "BALANCE: PASS ✅" : "BALANCE: FAIL ❌");
