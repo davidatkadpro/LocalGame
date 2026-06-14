@@ -76,6 +76,10 @@ export class PixiGame {
 
   private map: GameMap | null = null;
   private cam = { x: 0, y: 0, zoom: 1 };
+  // When set, the camera eases toward this world point each frame instead of
+  // hard-snapping (control-group recall, go-to-TC, minimap jump). Cleared once
+  // it arrives, or immediately when the player pans manually.
+  private camTarget: { x: number; y: number } | null = null;
   private hoverWorld = { x: 0, y: 0 };
 
   private unitSprites = new Map<number, Sprite>();
@@ -328,15 +332,15 @@ export class PixiGame {
   private frame(): void {
     if (this.destroyed) return;
 
-    // Minimap click -> jump camera.
+    // Minimap click -> glide camera.
     const jump = useStore.getState().cameraJump;
     if (jump) {
-      this.cam.x = jump.x;
-      this.cam.y = jump.y;
+      this.glideTo(jump.x, jump.y);
       useStore.setState({ cameraJump: null });
     }
 
-    this.applyKeyboardPan();
+    this.applyKeyboardPan(); // a held arrow key cancels any active glide
+    this.stepCameraGlide();
     this.applyCamera();
 
     this.now = performance.now();
@@ -379,10 +383,35 @@ export class PixiGame {
     // Arrow keys pan (letter keys are reserved for commands, e.g. A = attack-move).
     const k = keys;
     const speed = 0.25 / this.cam.zoom;
+    const panning =
+      k.has("arrowleft") || k.has("arrowright") || k.has("arrowup") || k.has("arrowdown");
+    if (panning) this.camTarget = null; // manual pan wins over an in-flight glide
     if (k.has("arrowleft")) this.cam.x -= speed;
     if (k.has("arrowright")) this.cam.x += speed;
     if (k.has("arrowup")) this.cam.y -= speed;
     if (k.has("arrowdown")) this.cam.y += speed;
+  }
+
+  /** Begin easing the camera toward a world point (see {@link camTarget}). */
+  private glideTo(x: number, y: number): void {
+    this.camTarget = { x, y };
+  }
+
+  /** Ease the camera one frame toward {@link camTarget}; snap + clear on arrival. */
+  private stepCameraGlide(): void {
+    const t = this.camTarget;
+    if (!t) return;
+    const dx = t.x - this.cam.x;
+    const dy = t.y - this.cam.y;
+    if (Math.abs(dx) < 0.02 && Math.abs(dy) < 0.02) {
+      this.cam.x = t.x;
+      this.cam.y = t.y;
+      this.camTarget = null;
+      return;
+    }
+    const ease = 0.2; // ~0.3s ease-out at 60fps
+    this.cam.x += dx * ease;
+    this.cam.y += dy * ease;
   }
 
   // ----------------------------------------------------------- reconcilers
@@ -931,10 +960,7 @@ export class PixiGame {
     const snap = useStore.getState().curr;
     if (!snap) return;
     const tc = snap.buildings.find((b) => b.owner === this.me() && b.type === "town_center");
-    if (tc) {
-      this.cam.x = tc.tx + 1.5;
-      this.cam.y = tc.ty + 1.5;
-    }
+    if (tc) this.glideTo(tc.tx + 1.5, tc.ty + 1.5);
   }
 
   private assignGroup(n: number): void {
@@ -957,8 +983,10 @@ export class PixiGame {
     if (this.lastGroupRecall.n === n && now - this.lastGroupRecall.t < 400 && snap) {
       const pts = snap.units.filter((u) => alive.includes(u.id));
       if (pts.length) {
-        this.cam.x = pts.reduce((s, u) => s + u.x, 0) / pts.length;
-        this.cam.y = pts.reduce((s, u) => s + u.y, 0) / pts.length;
+        this.glideTo(
+          pts.reduce((s, u) => s + u.x, 0) / pts.length,
+          pts.reduce((s, u) => s + u.y, 0) / pts.length,
+        );
       }
     }
     this.lastGroupRecall = { n, t: now };
@@ -1061,6 +1089,7 @@ export class PixiGame {
       this.cam.x -= (x - this.panLast.x) / scale;
       this.cam.y -= (y - this.panLast.y) / scale;
       this.panLast = { x, y };
+      this.camTarget = null; // manual pan wins over an in-flight glide
     }
 
     if (this.selecting) this.drawBox(info.startX, info.startY, x, y);
