@@ -202,6 +202,23 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     buildable: true,
     minAge: 1, // Feudal
   },
+  blacksmith: {
+    type: "blacksmith",
+    hp: 600,
+    sight: 4,
+    size: { w: 3, h: 3 },
+    cost: { wood: 150, stone: 40 },
+    buildMs: 20000,
+    providesPop: 0,
+    isDropOff: false,
+    canTrain: [],
+    // Home of the upper combat tiers (§7.3): attack II/III + armor II/III. Tier I
+    // stays at the barracks, so a Blacksmith is the gate to *deepening* an army's
+    // edge rather than just having one.
+    research: ["temperedBlades", "honedBlades", "leatherArmor", "plateArmor"],
+    buildable: true,
+    minAge: 1, // Feudal
+  },
   tower: {
     type: "tower",
     hp: 500,
@@ -380,6 +397,9 @@ export interface UpgradeDef {
   building: BuildingType;
   /** earliest age this upgrade can be researched (0 = Dark, 1 = Feudal, 2 = Imperial) */
   minAge?: number;
+  /** the upgrade that must already be researched first (the previous tier in a
+   *  line); undefined for a tier-I / standalone upgrade */
+  requires?: UpgradeId;
 }
 
 export const UPGRADE_DEFS: Record<UpgradeId, UpgradeDef> = {
@@ -409,7 +429,90 @@ export const UPGRADE_DEFS: Record<UpgradeId, UpgradeDef> = {
     building: "barracks",
     minAge: 1, // Feudal
   },
+  // ---- Tier II/III lines (§7.3, researched at the Blacksmith / Town Center) ----
+  // Magnitudes live in the UPGRADE_LINES tables below; the effective stat uses
+  // the highest tier owned, so a line never stacks on itself.
+  fineTools: {
+    id: "fineTools",
+    name: "Fine Tools",
+    blurb: "Workers gather +75% faster",
+    cost: { wood: 250, food: 200 },
+    researchMs: 30000,
+    building: "town_center",
+    minAge: 1, // Feudal
+    requires: "improvedTools",
+  },
+  masterTools: {
+    id: "masterTools",
+    name: "Master Tools",
+    blurb: "Workers gather +100% faster",
+    cost: { wood: 400, food: 300 },
+    researchMs: 45000,
+    building: "town_center",
+    minAge: 2, // Imperial
+    requires: "fineTools",
+  },
+  temperedBlades: {
+    id: "temperedBlades",
+    name: "Tempered Blades",
+    blurb: "Military units deal +45% damage",
+    cost: { food: 200, gold: 150 },
+    researchMs: 30000,
+    building: "blacksmith",
+    minAge: 1, // Feudal
+    requires: "sharpenedBlades",
+  },
+  honedBlades: {
+    id: "honedBlades",
+    name: "Honed Blades",
+    blurb: "Military units deal +65% damage",
+    cost: { food: 300, gold: 250 },
+    researchMs: 45000,
+    building: "blacksmith",
+    minAge: 2, // Imperial
+    requires: "temperedBlades",
+  },
+  leatherArmor: {
+    id: "leatherArmor",
+    name: "Leather Armor",
+    blurb: "Military units take −38% damage",
+    cost: { wood: 200, gold: 150 },
+    researchMs: 30000,
+    building: "blacksmith",
+    minAge: 1, // Feudal
+    requires: "paddedArmor",
+  },
+  plateArmor: {
+    id: "plateArmor",
+    name: "Plate Armor",
+    blurb: "Military units take −50% damage",
+    cost: { wood: 300, gold: 250 },
+    researchMs: 45000,
+    building: "blacksmith",
+    minAge: 2, // Imperial
+    requires: "leatherArmor",
+  },
 };
+
+/** Tiered upgrade lines (§7.3). Each line is researched in order — tier N
+ *  requires N-1 — and the effective stat applies the *highest* tier owned (the
+ *  tables below are parallel to these, indexed I/II/III). Tier I keeps the
+ *  original single-upgrade magnitudes, so existing balance holds. */
+export const UPGRADE_LINES: Record<"attack" | "armor" | "gather", UpgradeId[]> = {
+  attack: ["sharpenedBlades", "temperedBlades", "honedBlades"],
+  armor: ["paddedArmor", "leatherArmor", "plateArmor"],
+  gather: ["improvedTools", "fineTools", "masterTools"],
+};
+const ATTACK_MULT = [1.25, 1.45, 1.65]; // military damage dealt
+const ARMOR_MULT = [0.75, 0.62, 0.5]; // military damage taken (lower = better)
+const GATHER_MULT = [1.5, 1.75, 2.0]; // worker gather rate
+
+/** Index of the highest tier owned in `line` (research is sequential), or -1. */
+function bestTier(p: Player, line: UpgradeId[]): number {
+  let t = -1;
+  for (let i = 0; i < line.length; i++) if (p.upgrades.includes(line[i])) t = i;
+  return t;
+}
 
 // ---- Ages (Dark -> Feudal -> Imperial) ----
 
@@ -470,7 +573,9 @@ export function hasUpgrade(p: Player, id: UpgradeId): boolean {
 }
 
 export function gatherRate(p: Player): number {
-  return GATHER_PER_SEC * (hasUpgrade(p, "improvedTools") ? 1.5 : 1) * AGE_GATHER_MULT[p.age ?? 0];
+  const t = bestTier(p, UPGRADE_LINES.gather);
+  const tools = t >= 0 ? GATHER_MULT[t] : 1;
+  return GATHER_PER_SEC * tools * AGE_GATHER_MULT[p.age ?? 0];
 }
 
 /** Resource(s) each specialised drop-off camp is themed around and boosts. The
@@ -495,14 +600,16 @@ export function campBonusFor(type: BuildingType, kind: ResourceKind): number {
 export function unitDamage(p: Player, type: UnitType): number {
   const base = UNIT_DEFS[type].damage;
   if (!MILITARY.includes(type)) return base;
-  const blades = hasUpgrade(p, "sharpenedBlades") ? 1.25 : 1;
+  const t = bestTier(p, UPGRADE_LINES.attack);
+  const blades = t >= 0 ? ATTACK_MULT[t] : 1;
   return base * blades * AGE_DAMAGE_MULT[p.age ?? 0];
 }
 
 /** Damage actually taken by a unit of `type` owned by `target`, after armor. */
 export function incomingDamage(target: Player, type: UnitType, dmg: number): number {
   if (!MILITARY.includes(type)) return dmg;
-  const armor = hasUpgrade(target, "paddedArmor") ? 0.75 : 1;
+  const t = bestTier(target, UPGRADE_LINES.armor);
+  const armor = t >= 0 ? ARMOR_MULT[t] : 1;
   return dmg * armor * AGE_ARMOR_MULT[target.age ?? 0];
 }
 

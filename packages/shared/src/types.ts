@@ -14,6 +14,7 @@ export type BuildingType =
   | "house"
   | "barracks"
   | "stable"
+  | "blacksmith"
   | "tower"
   | "storehouse"
   | "lumber_camp"
@@ -26,8 +27,19 @@ export type BuildingType =
   | "gate"
   | "siege_workshop";
 
-/** Player-wide researches that modify effective stats. */
-export type UpgradeId = "improvedTools" | "sharpenedBlades" | "paddedArmor";
+/** Player-wide researches that modify effective stats. Tiered into three lines
+ *  (§7.3): attack (sharpened→tempered→honed), armor (padded→leather→plate), and
+ *  gather (improved→fine→master tools). Each tier requires the one below it. */
+export type UpgradeId =
+  | "improvedTools"
+  | "fineTools"
+  | "masterTools"
+  | "sharpenedBlades"
+  | "temperedBlades"
+  | "honedBlades"
+  | "paddedArmor"
+  | "leatherArmor"
+  | "plateArmor";
 
 export interface Vec2 {
   x: number;

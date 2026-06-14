@@ -441,6 +441,7 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
       const udef = UPGRADE_DEFS[cmd.upgrade];
       if (!udef || udef.building !== b.type) break;
       if (player.age < minAgeOfUpgrade(cmd.upgrade)) break; // age-gated
+      if (udef.requires && !player.upgrades.includes(udef.requires)) break; // tiered prereq (§7.3)
       if (player.upgrades.includes(cmd.upgrade)) break; // already have it
       // not already being researched elsewhere
       if (world.buildings.some((x) => x.owner === playerId && x.research === cmd.upgrade)) break;
