@@ -74,5 +74,33 @@ function check(label: string, cond: boolean, detail = "") {
   check("a teammate is still alive at the win", world.players[1].alive === true);
 }
 
+// ---- 5. a defeated player's orphaned army & buildings leave the board ------
+{
+  const world = createWorld(11, PS4);
+  const fog = createFog(world);
+  // Raze team 1's buildings but leave their army standing. The "no buildings"
+  // rule eliminates 2 and 3; their orphaned units (and any tower) must be cleared
+  // so nothing keeps acting / auto-firing for a player who is out of the game.
+  world.buildings = world.buildings.filter((b) => b.owner !== 2 && b.owner !== 3);
+  check(
+    "(team 1 still had units before the tick)",
+    world.units.some((u) => u.owner === 2 || u.owner === 3),
+  );
+  tick(world, fog);
+  check(
+    "team 1 is eliminated by the no-buildings rule",
+    !world.players[2].alive && !world.players[3].alive,
+  );
+  check(
+    "a defeated player's units are removed from the board",
+    !world.units.some((u) => u.owner === 2 || u.owner === 3),
+  );
+  check("the surviving team's units are untouched", world.units.some((u) => u.owner === 0 || u.owner === 1));
+  check(
+    "the surviving team wins",
+    world.winner !== null && world.players[world.winner].team === 0,
+  );
+}
+
 console.log(pass ? "TEAMS: PASS ✅" : "TEAMS: FAIL ❌");
 process.exit(pass ? 0 : 1);

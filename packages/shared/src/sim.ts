@@ -1845,6 +1845,15 @@ function updateWinState(world: World): void {
       p.alive = false;
     }
   }
+  // A defeated player leaves the board: drop any units/buildings that outlived
+  // their owner — an army caught out when the last building fell, or a tower
+  // left standing — so nothing keeps acting (or auto-firing) for a player who can
+  // no longer control it. Their owned farm nodes go with the farm.
+  world.units = world.units.filter((u) => world.players[u.owner].alive);
+  world.buildings = world.buildings.filter((b) => world.players[b.owner].alive);
+  world.resourceNodes = world.resourceNodes.filter(
+    (n) => n.owner === undefined || world.players[n.owner].alive,
+  );
   // Game ends when every surviving player belongs to a single team (last team
   // standing). winner is a representative of that team (FFA: the sole survivor).
   const alive = world.players.filter((p) => p.alive);
