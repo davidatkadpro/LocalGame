@@ -152,6 +152,10 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     providesPop: 5,
     isDropOff: true,
     canTrain: ["worker"],
+    // §7.5a: the TC bites back like a tower — a free, universal soft-deterrent
+    // vs early raids. Out-ranges archers (6 vs 5) so a lone archer can't snipe
+    // villagers under it; massed ranged units still overwhelm it. Tunable.
+    attack: { damage: 6, range: 6, attackMs: 1000 },
     research: ["improvedTools"],
     buildable: false,
   },
