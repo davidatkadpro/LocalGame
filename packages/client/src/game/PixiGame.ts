@@ -501,7 +501,7 @@ export class PixiGame {
 
       // combat feel: archers loose arrows; ram/soldier kick up impact bursts.
       if (u.type === "archer" && u.state === "attacking") {
-        const e = this.nearestEnemy(x, y, curr, UNIT_DEFS.archer.range);
+        const e = this.nearestEnemy(x, y, curr, UNIT_DEFS.archer.range, u.owner);
         if (e) this.emitShot(u.id, x, y - 0.2, e.x, e.y, 1400);
       } else if (u.type === "ram" && u.state === "attacking") {
         if (this.fireReady(u.id, 700)) this.emitImpact(x + fx.facing * 0.5, y + 0.1, "dust");
@@ -712,11 +712,13 @@ export class PixiGame {
           s.tint = bFlashing ? 0xff7a7a : 0xffffff;
         }
 
-      // towers loose arrows at the nearest enemy in range
-      if (b.type === "tower" && b.progress >= 1) {
-        const def2 = BUILDING_DEFS.tower.attack!;
-        const e = this.nearestEnemy(cx, cy, curr, def2.range);
-        if (e) this.emitShot(b.id, cx, cy - 0.6, e.x, e.y, def2.attackMs);
+      // Defensive buildings (towers and now the TC) loose arrows at the nearest
+      // enemy *of their owner* in range — any building with an attack def, not
+      // just towers. The shot is cosmetic; the sim decides the real hits.
+      const atk = def.attack;
+      if (atk && b.progress >= 1) {
+        const e = this.nearestEnemy(cx, cy, curr, atk.range, b.owner);
+        if (e) this.emitShot(b.id, cx, cy - 0.6, e.x, e.y, atk.attackMs);
       }
 
       // "construction complete" jingle when one of my buildings finishes.
@@ -907,11 +909,18 @@ export class PixiGame {
   }
 
   /** Nearest enemy unit to a point within `range`, from the current snapshot. */
-  private nearestEnemy(x: number, y: number, snap: Snapshot, range: number): UnitDTO | null {
+  /** Nearest unit that is an enemy of `owner`, within `range` (or null). */
+  private nearestEnemy(
+    x: number,
+    y: number,
+    snap: Snapshot,
+    range: number,
+    owner: number,
+  ): UnitDTO | null {
     let best: UnitDTO | null = null;
     let bd = range;
     for (const u of snap.units) {
-      if (u.owner === this.me()) continue;
+      if (!this.areEnemies(owner, u.owner)) continue;
       const d = Math.hypot(u.x - x, u.y - y);
       if (d < bd) {
         bd = d;
@@ -1492,14 +1501,19 @@ export class PixiGame {
     return useStore.getState().myPlayerId ?? 0;
   }
 
-  /** Is `owner` an enemy (different team)? Allies and self are not. */
-  private isEnemy(owner: number): boolean {
-    if (owner === this.me()) return false;
+  /** Are owners `a` and `b` on opposing teams? Self and allies are not enemies. */
+  private areEnemies(a: number, b: number): boolean {
+    if (a === b) return false;
     const players = useStore.getState().players;
-    const myTeam = players.find((p) => p.id === this.me())?.team;
-    const theirTeam = players.find((p) => p.id === owner)?.team;
-    if (myTeam === undefined || theirTeam === undefined) return true; // FFA fallback
-    return myTeam !== theirTeam;
+    const ta = players.find((p) => p.id === a)?.team;
+    const tb = players.find((p) => p.id === b)?.team;
+    if (ta === undefined || tb === undefined) return true; // FFA fallback
+    return ta !== tb;
+  }
+
+  /** Is `owner` an enemy of the local player? Allies and self are not. */
+  private isEnemy(owner: number): boolean {
+    return this.areEnemies(this.me(), owner);
   }
 
   /** Nearest own unit to a world point, within a small radius, or null. */

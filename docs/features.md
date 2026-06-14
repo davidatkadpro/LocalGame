@@ -551,7 +551,7 @@ building costs.
 [constants.ts](packages/shared/src/constants.ts),
 [map.ts](packages/shared/src/map.ts), [Hud.tsx](packages/client/src/ui/Hud.tsx).
 
-### 7.5 Town Center fires arrows + Garrison  — 🔨 **M**
+### 7.5 Town Center fires arrows + Garrison  — 🔨 **M** — ✅ TC fires arrows (garrison pending)
 
 **Have today.** Towers auto-attack visible enemies in range.
 **Add.** (a) Give the **TC** the same building-weapon loop so a base bites back;
@@ -560,6 +560,16 @@ add arrows, villagers pop out on command. Classic AoE raid-survival layer.
 **Files.** [sim.ts](packages/shared/src/sim.ts) (building-attack + garrison
 list), [constants.ts](packages/shared/src/constants.ts),
 [Hud.tsx](packages/client/src/ui/Hud.tsx) (eject button).
+**Status.** 7.5a ✅ — the TC carries a tower-style `attack` def
+(`{ damage: 6, range: 6, attackMs: 1000 }`, tunable), so the shared building
+auto-attack loop (`tickTowers`) makes every base bite back. Range 6 out-ranges
+archers (5) so a lone archer can't snipe villagers under it, while massed ranged
+units still overwhelm it (one target per volley). The client arrow visual was
+generalised from towers to *any* building with an `attack` def and made
+owner-aware (an enemy TC no longer appears to fire on its own workers).
+Sim-tested in [tc_arrows.test.ts](scripts/tc_arrows.test.ts). 7.5b **garrison**
+(shelter units, garrisoned archers add arrows, villagers eject on command) is
+deferred.
 
 ### 7.6 Walls → Gates, auto-connect, and tiers  — 🔨 **M** — ✅ gates + auto-connect (tiers pending 7.4)
 
