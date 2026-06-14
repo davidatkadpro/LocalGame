@@ -172,7 +172,7 @@ export function Hud({
 
   return (
     <>
-      <div className="hud-top">
+      <div className={`hud-top${isMobile && !minimapOpen ? " full" : ""}`}>
         <Res icon="🪵" label="Wood" value={res.wood} rate={income.wood} />
         <Res icon="🍖" label="Food" value={res.food} rate={income.food} />
         <Res icon="🪙" label="Gold" value={res.gold} rate={income.gold} />
@@ -196,15 +196,25 @@ export function Hud({
         <span className="age-badge" title="Your current age — advance at the Town Center">
           ⌛ {AGE_DEFS[age].name}
         </span>
-        {upgrades.length > 0 && (
-          <span className="upgrades" title="Researched upgrades">
-            {upgrades.map((u) => (
-              <span className="badge" key={u} title={UPGRADE_DEFS[u].name}>
-                ⬆ {UPGRADE_DEFS[u].name.split(" ")[1] ?? UPGRADE_DEFS[u].name}
-              </span>
-            ))}
-          </span>
-        )}
+        {upgrades.length > 0 &&
+          (isMobile ? (
+            // The phone top bar is tight; collapse the badges to a single count
+            // (the full list stays in the tooltip) so it doesn't wrap a third row.
+            <span
+              className="upgrades"
+              title={`Researched: ${upgrades.map((u) => UPGRADE_DEFS[u].name).join(", ")}`}
+            >
+              <span className="badge">⬆ {upgrades.length}</span>
+            </span>
+          ) : (
+            <span className="upgrades" title="Researched upgrades">
+              {upgrades.map((u) => (
+                <span className="badge" key={u} title={UPGRADE_DEFS[u].name}>
+                  ⬆ {UPGRADE_DEFS[u].name.split(" ")[1] ?? UPGRADE_DEFS[u].name}
+                </span>
+              ))}
+            </span>
+          ))}
         {me === 0 && (
           <button
             className="icon-btn"
@@ -225,21 +235,10 @@ export function Hud({
 
       {wonder && (
         <div
-          className="wonder-banner"
+          className={`wonder-banner${isMobile ? " mobile" : ""}`}
           title="A finished Wonder wins the game if it survives the countdown"
           style={{
-            position: "absolute",
-            top: 56,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 50,
-            padding: "5px 14px",
-            borderRadius: 8,
-            whiteSpace: "nowrap",
-            fontWeight: 700,
-            color: "#fff",
             background: wonder.team === myTeam ? "rgba(39,174,96,0.92)" : "rgba(192,57,43,0.94)",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.45)",
           }}
         >
           {wonder.team === myTeam
@@ -628,6 +627,14 @@ function MobileBottom({
 
   const toggle = (t: MobileTab) => setTab((cur) => (cur === t ? null : t));
 
+  // Arming an action whose next step is a map tap/drag (place a building,
+  // attack-move, patrol, box-select) must collapse the drawer first — otherwise
+  // it covers the half of the screen the player now has to reach.
+  const armAndClose = (fn: () => void) => () => {
+    fn();
+    setTab(null);
+  };
+
   const selLabel = building
     ? BUILDING_LABEL[building.type as BuildingType]
     : selectedCount > 0
@@ -638,13 +645,20 @@ function MobileBottom({
     <div className="hud-mobile">
       {tab && (
         <div className="hud-drawer">
-          {tab === "build" && <BuildPanelView onPlace={onPlace} />}
+          {tab === "build" && (
+            <BuildPanelView
+              onPlace={(b) => {
+                onPlace(b);
+                setTab(null);
+              }}
+            />
+          )}
           {tab === "commands" && (
             <CommandsPanelView
               selectArmed={selectArmed}
-              onSelectMode={onSelectMode}
-              onAttackMove={onAttackMove}
-              onPatrol={onPatrol}
+              onSelectMode={armAndClose(onSelectMode)}
+              onAttackMove={armAndClose(onAttackMove)}
+              onPatrol={armAndClose(onPatrol)}
               onStance={onStance}
               stance={stance}
               onStop={onStop}

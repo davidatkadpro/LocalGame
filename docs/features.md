@@ -854,7 +854,7 @@ so a dropped phone at a couch/LAN session doesn't end someone's game.
 mid-pause now gets an immediate snapshot + freeze state. Covered by
 `scripts/pause.test.ts` (in-process, no WebSocket).
 
-### 8.9 Mobile refinement pass  — 🔨 **M** — *do LAST, after all §7 features land*
+### 8.9 Mobile refinement pass  — 🔨 **M** — ✅ done
 
 Every new feature in §7 adds HUD/controls that need a touch treatment, so a
 holistic mobile pass only pays off **once the feature set is complete** — doing
@@ -872,6 +872,25 @@ it earlier means redoing it. Scope when we get there:
   needed.
 - **Readability at small size** — income readout (8.3), alerts (8.5), and
   unit-state cues (8.2) must stay legible on a phone.
+
+**Status.** ✅ — because each §7 feature was built with its touch target in place
+as it landed (the mobile tabbed HUD, pinch/pan/long-press-command, the §3.3
+box-select toggle, garrison eject, stance row, age-up, research tiers, gate/wall
+drag-line), the audit confirmed **every new system already has a reachable tap
+path** — so this pass is refinement, not catch-up. Four felt fixes shipped:
+**(1) the bottom drawer now auto-collapses the moment you arm a map-targeting
+action** (place a building, attack-move, patrol, box-select) — previously the open
+drawer covered the half of the screen you then had to tap/drag, the single worst
+mobile friction; **(2) the Wonder countdown banner** moved off a hard-coded
+`top: 56px` (which collided with the wrapping, multi-row phone resource bar and
+ignored the notch) into a `.wonder-banner` class that on mobile pins above the tab
+bar with safe-area insets and is non-interactive so it never eats a map tap;
+**(3) the top resource bar reclaims the ~124px it reserved for the minimap**
+whenever the minimap is hidden behind its tab (the phone default), roughly +50%
+width on a 360px screen; **(4) the upgrade badges collapse to a single ⬆N count**
+(full list in the tooltip) so a long tech list can't wrap the cramped top bar a
+third row. Client-only (no sim/protocol change); client typecheck + production
+build green.
 
 **Files.** [Hud.tsx](packages/client/src/ui/Hud.tsx),
 [styles.css](packages/client/src/ui/styles.css),
