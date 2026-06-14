@@ -4,6 +4,7 @@ export * from "./constants";
 export * from "./rng";
 export * from "./geometry";
 export * from "./map";
+export * from "./placement";
 export * from "./pathfinding";
 export * from "./fog";
 export * from "./sim";

@@ -9,6 +9,7 @@ import {
   TICK_MS,
   UNIT_DEFS,
   base64ToBytes,
+  canPlaceBuilding,
   isWall,
   minAgeOfBuilding,
   rectContains,
@@ -1184,25 +1185,24 @@ export class PixiGame {
     g.moveTo(cx, cy - r).lineTo(cx, cy + r).stroke({ width: sw, color: col, alpha: 0.95 });
   }
 
-  /** Mirror of the server's placement rule, using snapshot data, for the ghost. */
+  /** Adapter: run the shared placement rule over the current snapshot, so the
+   *  ghost agrees with the server by construction. */
   private clientPlacementValid(type: BuildingType, tx: number, ty: number): boolean {
     if (!this.map) return false;
-    const def = BUILDING_DEFS[type];
+    const map = this.map;
     const snap = useStore.getState().curr;
-    for (let y = ty; y < ty + def.size.h; y++) {
-      for (let x = tx; x < tx + def.size.w; x++) {
-        if (x < 0 || y < 0 || x >= this.map.width || y >= this.map.height) return false;
-        const terr = this.map.tiles[y * this.map.width + x];
-        if (terr === "water" || terr === "rock") return false;
-        if (snap?.resources.some((n) => n.tx === x && n.ty === y)) return false;
-        const hit = snap?.buildings.some((b) => {
-          const bd = BUILDING_DEFS[b.type as BuildingType].size;
-          return rectContains(b.tx, b.ty, bd.w, bd.h, x, y);
-        });
-        if (hit) return false;
-      }
-    }
-    return true;
+    return canPlaceBuilding(
+      {
+        map,
+        hasResourceAt: (x, y) => !!snap?.resources.some((n) => n.tx === x && n.ty === y),
+        buildingFootprints: (snap?.buildings ?? []).map((b) => {
+          const s = BUILDING_DEFS[b.type as BuildingType].size;
+          return { x: b.tx, y: b.ty, w: s.w, h: s.h };
+        }),
+      },
+      type,
+      { x: tx, y: ty },
+    );
   }
 
   private drawFog(snap: Snapshot): void {

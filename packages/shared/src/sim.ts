@@ -32,8 +32,9 @@ import {
   unitDamage,
 } from "./constants";
 import { Fog, updateVision } from "./fog";
-import { dist, inBounds, rectContains, tileIndex } from "./geometry";
+import { dist, inBounds, rectContains } from "./geometry";
 import { generateMap } from "./map";
+import { canPlaceBuilding } from "./placement";
 import { findPath, isWalkable } from "./pathfinding";
 import {
   bytesToBase64,
@@ -832,21 +833,20 @@ function countQueued(player: { id: PlayerId }, world: World): number {
   return n;
 }
 
+/** Adapter: run the shared placement rule over the authoritative `World`. */
 export function placementValid(world: World, type: BuildingType, tile: Vec2): boolean {
-  const d = BUILDING_DEFS[type].size;
-  for (let y = tile.y; y < tile.y + d.h; y++) {
-    for (let x = tile.x; x < tile.x + d.w; x++) {
-      if (!inBounds(world.map, x, y)) return false;
-      const terr = world.map.tiles[tileIndex(world.map, x, y)];
-      if (terr === "water" || terr === "rock") return false;
-      if (world.resourceNodes.some((n) => n.tile.x === x && n.tile.y === y)) return false;
-      for (const b of world.buildings) {
-        const bd = BUILDING_DEFS[b.type].size;
-        if (rectContains(b.tile.x, b.tile.y, bd.w, bd.h, x, y)) return false;
-      }
-    }
-  }
-  return true;
+  return canPlaceBuilding(
+    {
+      map: world.map,
+      hasResourceAt: (x, y) => world.resourceNodes.some((n) => n.tile.x === x && n.tile.y === y),
+      buildingFootprints: world.buildings.map((b) => {
+        const s = BUILDING_DEFS[b.type].size;
+        return { x: b.tile.x, y: b.tile.y, w: s.w, h: s.h };
+      }),
+    },
+    type,
+    tile,
+  );
 }
 
 // ---------------------------------------------------------------- tick
