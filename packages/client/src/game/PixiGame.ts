@@ -271,6 +271,7 @@ export class PixiGame {
     this.placing = null;
     this.armedAttack = false;
     this.armedPatrol = false;
+    this.wallDragStart = null; // a fresh box-select cancels any in-flight wall drag
     useStore.getState().setSelectArmed(true);
   }
 
@@ -774,7 +775,7 @@ export class PixiGame {
     }
     for (const [id, sp] of this.buildingSprites) {
       if (!seen.has(id)) {
-        sp.destroy();
+        sp.destroy({ children: true }); // also free the team-colour accent child
         this.buildingSprites.delete(id);
         this.buildProgress.delete(id);
         this.buildingFx.delete(id);
@@ -1094,7 +1095,7 @@ export class PixiGame {
     this.dying = this.dying.filter((d) => {
       const prog = (this.now - d.born) / DUR;
       if (prog >= 1) {
-        d.sp.destroy();
+        d.sp.destroy({ children: true }); // also free the team-colour accent child
         return false;
       }
       const sign = Math.sign(d.sp.scale.x) || 1;

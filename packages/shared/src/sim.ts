@@ -797,7 +797,9 @@ function tileCenterOf(tile: Vec2): Vec2 {
 function countQueued(player: { id: PlayerId }, world: World): number {
   let n = 0;
   for (const b of world.buildings) {
-    if (b.owner === player.id) n += b.queue.length;
+    // Sum the queued units' *pop cost*, not the count — a queued trebuchet (3
+    // pop) must reserve 3 against the cap, or multi-pop siege overshoots popCap.
+    if (b.owner === player.id) for (const t of b.queue) n += UNIT_DEFS[t].popCost;
   }
   return n;
 }

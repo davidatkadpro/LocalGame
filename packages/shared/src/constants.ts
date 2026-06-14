@@ -199,7 +199,7 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     // vs early raids. Out-ranges archers (6 vs 5) so a lone archer can't snipe
     // villagers under it; massed ranged units still overwhelm it. Tunable.
     attack: { damage: 6, range: 6, attackMs: 1000 },
-    research: ["improvedTools"],
+    research: ["improvedTools", "fineTools", "masterTools"],
     buildable: false,
   },
   house: {
@@ -422,9 +422,9 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     hp: 1500,
     sight: 6,
     size: { w: 3, h: 3 },
-    // §7.10 — an alternate, non-annihilation win. Hugely expensive across every
-    // resource (you trade an army's worth of economy to race the clock) and very
-    // slow to raise, so the enemy gets real time to mount an assault. Tunable.
+    // §7.10 — an alternate, non-annihilation win. Hugely expensive (wood + gold +
+    // stone, an army's worth of economy to race the clock) and very slow to
+    // raise, so the enemy gets real time to mount an assault. Tunable.
     cost: { wood: 600, gold: 500, stone: 400 },
     buildMs: 90000,
     providesPop: 0,

@@ -60,7 +60,13 @@ wss.on("connection", (ws: WebSocket) => {
     } catch {
       return;
     }
-    room.onMessage(conn, msg);
+    // A malformed message must never take the whole host down with it — one bad
+    // packet from a buggy/old client would otherwise crash the room for everyone.
+    try {
+      room.onMessage(conn, msg);
+    } catch (err) {
+      console.error("error handling client message:", err);
+    }
   });
 
   ws.on("close", () => room.onDisconnect(conn));
