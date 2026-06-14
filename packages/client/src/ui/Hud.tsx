@@ -334,7 +334,8 @@ function ControlsText() {
       Drag-select / click your units. Right-click (or tap) to move, gather, or attack. With a worker
       selected, right-click/tap a <b>sheep or cow</b> to hunt it for food. Press{" "}
       <b>A</b> then click for attack-move; <b>S</b> stops; <b>H</b> jumps to your town center;{" "}
-      <b>.</b> cycles idle workers. Double-click a unit to grab all of its type on screen.
+      <b>Space</b> jumps to the latest under-attack alert; <b>.</b> cycles idle workers. Double-click
+      a unit to grab all of its type on screen.
       <b> Ctrl+1–9</b> sets a control group, <b>1–9</b> recalls it (double-tap to centre). Select a
       building, then right-click/tap to set its rally point. Right-click/tap a <b>damaged building</b>{" "}
       with workers to repair it. <b>Shift+click</b> queues orders (move/gather/attack). Pick{" "}

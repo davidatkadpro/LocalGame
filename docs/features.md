@@ -650,18 +650,23 @@ the selection to just that type** (AoE idiom), and make production-queue slots
 [PixiGame.ts](packages/client/src/game/PixiGame.ts),
 [sim.ts](packages/shared/src/sim.ts) (queue cancel + refund).
 
-### 8.5 Click an alert to jump there  — 🔨 **S**
+### 8.5 Click an alert to jump there  — 🔨 **S** — ✅ done (Space)
 
 Under-attack pings exist; make clicking a ping (or pressing `Space`) snap the
 camera to the most recent alert. Closes the loop on the alert system.
 **Files.** [Minimap.tsx](packages/client/src/ui/Minimap.tsx),
 [PixiGame.ts](packages/client/src/game/PixiGame.ts).
+**Status.** `Space` glides to the most recent under-attack ping (<8s old).
+Minimap clicks already jump to wherever you click, so the ping is reachable
+there too. Controls help updated.
 
-### 8.6 Smooth camera + follow-selected  — 🆕 **S**
+### 8.6 Smooth camera + follow-selected  — 🆕 **S** — ✅ glide done (`4e44055`)
 
 Lerp camera moves (control-group recall and go-to-TC currently hard-snap), and a
 "follow selection" toggle. Cheap; makes the whole game feel less rigid.
 **Files.** [PixiGame.ts](packages/client/src/game/PixiGame.ts).
+**Status.** Camera now eases to jump targets (recall / go-to-TC / minimap) over
+~0.3s; manual pan cancels the glide. *Follow-selection toggle still TODO.*
 
 ### 8.7 Pacing / balance pass  — 🔨 **M** — *a deliverable in itself*
 

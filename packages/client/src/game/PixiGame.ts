@@ -940,6 +940,9 @@ export class PixiGame {
     } else if (k === ".") {
       this.selectNextIdleWorker();
       e.preventDefault();
+    } else if (k === " " || k === "spacebar") {
+      this.jumpToLatestAlert();
+      e.preventDefault();
     } else if (k === "escape") {
       this.armedAttack = false;
       this.placing = null;
@@ -961,6 +964,19 @@ export class PixiGame {
     if (!snap) return;
     const tc = snap.buildings.find((b) => b.owner === this.me() && b.type === "town_center");
     if (tc) this.glideTo(tc.tx + 1.5, tc.ty + 1.5);
+  }
+
+  /** Glide the camera to the most recent under-attack ping (Space). */
+  private jumpToLatestAlert(): void {
+    const pings = useStore.getState().pings;
+    const now = performance.now();
+    // Newest ping is appended last; only honour reasonably fresh alerts.
+    for (let i = pings.length - 1; i >= 0; i--) {
+      if (now - pings[i].born < 8000) {
+        this.glideTo(pings[i].x, pings[i].y);
+        return;
+      }
+    }
   }
 
   private assignGroup(n: number): void {
