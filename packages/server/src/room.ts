@@ -51,6 +51,7 @@ export class GameRoom {
   private loop: ReturnType<typeof setInterval> | null = null;
   private hostPlayerId: number | null = null;
   private conns = new Set<Conn>();
+  private paused = false; // host can freeze a running match
   // Persisted all-time standings (survives matches and server restarts).
   private leaderboard = new Leaderboard();
 
@@ -99,6 +100,15 @@ export class GameRoom {
     this.hostPlayerId = null;
     this.mode = "ffa";
     this.phase = "lobby";
+    this.paused = false;
+  }
+
+  /** Freeze or unfreeze the match and tell every connected player. */
+  private setPaused(paused: boolean): void {
+    if (this.paused === paused) return;
+    this.paused = paused;
+    const by = this.hostPlayerId ?? 0;
+    for (const s of this.slots.values()) s.conn?.send({ t: "paused", paused, by });
   }
 
   onMessage(conn: Conn, msg: ClientMessage): void {
@@ -140,8 +150,15 @@ export class GameRoom {
       case "startGame":
         if (conn.playerId === this.hostPlayerId) this.startGame();
         break;
+      case "setPaused":
+        // Host freezes/unfreezes a running match (e.g. someone stepped away).
+        if (conn.playerId === this.hostPlayerId && this.phase === "playing") {
+          this.setPaused(msg.paused);
+        }
+        break;
       case "command":
-        if (this.phase === "playing" && this.world && conn.playerId !== null) {
+        // Commands are dropped while paused so the freeze is a true stop.
+        if (this.phase === "playing" && !this.paused && this.world && conn.playerId !== null) {
           applyCommand(this.world, conn.playerId, msg.cmd);
         }
         break;
@@ -165,6 +182,10 @@ export class GameRoom {
       conn.playerId = pid;
       if (this.phase === "playing" && this.world) {
         this.sendGameStart(conn, pid); // resync the match state
+        // One immediate snapshot + the freeze state, so reconnecting mid-pause
+        // shows the frozen board rather than a blank one.
+        if (this.fog) conn.send({ t: "snapshot", snap: viewFor(this.world, this.fog, pid) });
+        if (this.paused) conn.send({ t: "paused", paused: true, by: this.hostPlayerId ?? pid });
       } else {
         conn.send({ t: "welcome", playerId: pid });
         this.broadcastLobby();
@@ -254,6 +275,7 @@ export class GameRoom {
     const state = this.lobbyState();
     if (!state.canStart) return;
     this.phase = "playing";
+    this.paused = false;
 
     const ordered = [...this.slots.entries()].sort((a, b) => a[0] - b[0]);
     // Re-pack player ids to 0..n-1 so the sim has contiguous slots. In FFA each
@@ -303,7 +325,7 @@ export class GameRoom {
   }
 
   private step(): void {
-    if (!this.world || !this.fog) return;
+    if (!this.world || !this.fog || this.paused) return; // frozen while paused
     tick(this.world, this.fog);
 
     for (const [playerId, slot] of this.slots) {

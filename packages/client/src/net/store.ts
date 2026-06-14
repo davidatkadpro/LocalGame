@@ -19,6 +19,7 @@ interface GameState {
   clientId: string;
   myName: string | null;
   reconnecting: boolean;
+  paused: boolean; // host froze the running match
   lobby: LobbyState | null;
   error: string | null;
 
@@ -63,6 +64,7 @@ interface GameState {
   setMode: (mode: "ffa" | "2v2") => void;
   setTeam: (target: number, team: number) => void;
   startGame: () => void;
+  setPaused: (paused: boolean) => void;
   command: (cmd: Command) => void;
 }
 
@@ -114,6 +116,7 @@ export const useStore = create<GameState>((set, get) => ({
   clientId: ensureClientId(),
   myName: null,
   reconnecting: false,
+  paused: false,
   lobby: null,
   error: null,
   map: null,
@@ -185,11 +188,15 @@ export const useStore = create<GameState>((set, get) => ({
               income: { wood: 0, food: 0, gold: 0 },
               winner: null,
               reconnecting: false,
+              paused: false,
               selectedUnits: [],
               selectedBuilding: null,
               selectArmed: false,
               pings: [],
             });
+            break;
+          case "paused":
+            set({ paused: msg.paused });
             break;
           case "snapshot":
             set((s) => ({
@@ -206,6 +213,7 @@ export const useStore = create<GameState>((set, get) => ({
               endPlayers: msg.players,
               endStats: msg.stats,
               reconnecting: false,
+              paused: false,
             });
             // Match is finished — stop auto-reconnecting.
             get().conn?.close();
@@ -228,5 +236,6 @@ export const useStore = create<GameState>((set, get) => ({
   setMode: (mode) => get().conn?.send({ t: "setMode", mode }),
   setTeam: (target, team) => get().conn?.send({ t: "setTeam", target, team }),
   startGame: () => get().conn?.send({ t: "startGame" }),
+  setPaused: (paused) => get().conn?.send({ t: "setPaused", paused }),
   command: (cmd) => get().conn?.send({ t: "command", cmd }),
 }));

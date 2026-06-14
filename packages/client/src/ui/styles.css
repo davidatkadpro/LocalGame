@@ -548,6 +548,36 @@ button.cancel {
   line-height: 1;
 }
 
+/* Host paused the match: a centred card that leaves the frozen map visible and
+   still pannable (overlay itself ignores pointer events; only the card takes them). */
+.pause-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 110;
+}
+.pause-card {
+  pointer-events: auto;
+  background: rgba(16, 20, 26, 0.88);
+  border: 1px solid #3a4350;
+  border-radius: 12px;
+  padding: 20px 32px;
+  text-align: center;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+.pause-card h1 {
+  margin: 0 0 6px;
+  font-size: 28px;
+  letter-spacing: 2px;
+}
+.pause-card p {
+  margin: 0 0 14px;
+}
+
 /* Rich selection panel: one row per unit type, click to sub-select. */
 .sel-groups {
   display: flex;

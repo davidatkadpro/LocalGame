@@ -691,7 +691,7 @@ a clean ~15-min match arc. Pure data, validated against the sim suite. Best done
 numbers).
 **Files.** [constants.ts](packages/shared/src/constants.ts), sim tests.
 
-### 8.8 Reconnect / pause for LAN play  — 🆕 **M**
+### 8.8 Reconnect / pause for LAN play  — 🆕 **M** — ✅ done
 
 A host pause and clean rejoin-after-disconnect (resync from the latest snapshot)
 so a dropped phone at a couch/LAN session doesn't end someone's game.
@@ -699,6 +699,12 @@ so a dropped phone at a couch/LAN session doesn't end someone's game.
 [index.ts](packages/server/src/index.ts),
 [connection.ts](packages/client/src/net/connection.ts),
 [protocol.ts](packages/shared/src/protocol.ts).
+**Status.** Reconnect was *already* implemented (slot kept alive on disconnect,
+`handleJoin` re-attaches by `clientId` and resyncs). Added **host pause**: a
+`setPaused` command (host-only) freezes the tick loop and drops commands; a
+`paused` message drives a ⏸ button (host) + a "Paused" overlay (all). Reconnecting
+mid-pause now gets an immediate snapshot + freeze state. Covered by
+`scripts/pause.test.ts` (in-process, no WebSocket).
 
 ### 8.9 Mobile refinement pass  — 🔨 **M** — *do LAST, after all §7 features land*
 

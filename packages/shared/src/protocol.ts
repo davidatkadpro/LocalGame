@@ -157,6 +157,7 @@ export type ClientMessage =
   | { t: "setMode"; mode: GameMode } // host only
   | { t: "setTeam"; target: PlayerId; team: number } // host only
   | { t: "startGame" }
+  | { t: "setPaused"; paused: boolean } // host only, mid-match
   | { t: "command"; cmd: Command };
 
 // ---------- Server -> Client ----------
@@ -166,6 +167,7 @@ export type ServerMessage =
   | { t: "lobby"; state: LobbyState }
   | { t: "gameStart"; map: GameMap; players: PlayerPublic[]; you: PlayerId; seed: number }
   | { t: "snapshot"; snap: Snapshot }
+  | { t: "paused"; paused: boolean; by: PlayerId } // match frozen by the host
   | { t: "gameOver"; winner: PlayerId | null; players: PlayerPublic[]; stats: PlayerStats[] }
   | { t: "error"; message: string };
 

@@ -67,6 +67,8 @@ export function Hud({
   const selectedBuilding = useStore((s) => s.selectedBuilding);
   const selectArmed = useStore((s) => s.selectArmed);
   const command = useStore((s) => s.command);
+  const paused = useStore((s) => s.paused);
+  const setPaused = useStore((s) => s.setPaused);
   const [confirmConcede, setConfirmConcede] = useState(false);
   const [muted, setMuted] = useState(isMuted());
   const [showControls, setShowControls] = useState(
@@ -129,6 +131,15 @@ export function Hud({
               </span>
             ))}
           </span>
+        )}
+        {me === 0 && (
+          <button
+            className="icon-btn"
+            title={paused ? "Resume match" : "Pause match (host)"}
+            onClick={() => setPaused(!paused)}
+          >
+            {paused ? "▶" : "⏸"}
+          </button>
         )}
         <button
           className="icon-btn"
@@ -200,6 +211,18 @@ export function Hud({
                 🏳 Concede
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {paused && (
+        <div className="pause-overlay">
+          <div className="pause-card">
+            <h1>⏸ Paused</h1>
+            <p className="muted">
+              {me === 0 ? "You paused the match." : "The host paused the match."}
+            </p>
+            {me === 0 && <button onClick={() => setPaused(false)}>▶ Resume</button>}
           </div>
         </div>
       )}
