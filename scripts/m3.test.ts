@@ -689,7 +689,7 @@ function findOpenBlock(world: ReturnType<typeof createWorld>, size: number): { x
   const dark = createWorld(7, [PS[0]]);
   const ds = { ...stable, id: dark.nextEntityId++ };
   dark.buildings.push(ds);
-  dark.players[0].resources = { wood: 9999, food: 9999, gold: 9999 };
+  dark.players[0].resources = { wood: 9999, food: 9999, gold: 9999, stone: 9999 };
   applyCommand(dark, 0, { c: "train", building: ds.id, unit: "cavalry" });
   check("cavalry is age-gated (no Dark-Age training)", ds.queue.length === 0);
 }

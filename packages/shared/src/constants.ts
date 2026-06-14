@@ -23,7 +23,9 @@ export const MAP_WIDTH = 64;
 export const MAP_HEIGHT = 64;
 
 // ---- Economy ----
-export const STARTING_RESOURCES: Resources = { wood: 200, food: 200, gold: 120 };
+// Stone is the defensive resource (towers / fortifications); a small starter
+// stock lets a Feudal player raise their first tower without mining first.
+export const STARTING_RESOURCES: Resources = { wood: 200, food: 200, gold: 120, stone: 100 };
 export const CARRY_CAPACITY = 10; // units carry this much before returning
 export const GATHER_PER_SEC = 6; // resource units harvested per second
 
@@ -205,7 +207,9 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     hp: 500,
     sight: 8,
     size: { w: 2, h: 2 },
-    cost: { wood: 100, gold: 25 },
+    // §7.4: towers are the stone sink — gold now funds units & tech, stone funds
+    // defence. So a turtle/defensive plan has to contest the map's stone patches.
+    cost: { wood: 75, stone: 50 },
     buildMs: 15000,
     providesPop: 0,
     isDropOff: false,
@@ -429,20 +433,22 @@ export function gatherRate(p: Player): number {
   return GATHER_PER_SEC * (hasUpgrade(p, "improvedTools") ? 1.5 : 1) * AGE_GATHER_MULT[p.age ?? 0];
 }
 
-/** Resource each specialised drop-off camp is themed around and boosts. */
-export const CAMP_RESOURCE: Partial<Record<BuildingType, ResourceKind>> = {
-  lumber_camp: "wood",
-  mining_camp: "gold",
-  mill: "food",
+/** Resource(s) each specialised drop-off camp is themed around and boosts. The
+ *  Mining Camp works both ores (gold + stone), so it's the drop-off for §7.4
+ *  stone as well as gold. */
+export const CAMP_RESOURCE: Partial<Record<BuildingType, ResourceKind[]>> = {
+  lumber_camp: ["wood"],
+  mining_camp: ["gold", "stone"],
+  mill: ["food"],
 };
 
 /** Bonus a matching camp applies to its resource's gather rate. */
 export const CAMP_GATHER_BONUS = 1.2; // +20%
 
 /** Gather-rate multiplier a drop-off of `type` grants for harvesting `kind`
- *  (1 = no bonus). Only specialised camps boost their own resource. */
+ *  (1 = no bonus). Only specialised camps boost the resource(s) they handle. */
 export function campBonusFor(type: BuildingType, kind: ResourceKind): number {
-  return CAMP_RESOURCE[type] === kind ? CAMP_GATHER_BONUS : 1;
+  return CAMP_RESOURCE[type]?.includes(kind) ? CAMP_GATHER_BONUS : 1;
 }
 
 /** Damage a unit of `type` owned by `p` deals (before target armor). */
@@ -492,6 +498,7 @@ export const RESOURCE_NODE_AMOUNT: Record<ResourceKind, number> = {
   wood: 300,
   food: 200,
   gold: 400,
+  stone: 350,
 };
 
 // ---- Wildlife ----
@@ -511,14 +518,15 @@ export const ANIMAL_DEFS: Record<AnimalKind, AnimalDef> = {
 };
 
 export function emptyResources(): Resources {
-  return { wood: 0, food: 0, gold: 0 };
+  return { wood: 0, food: 0, gold: 0, stone: 0 };
 }
 
 export function canAfford(have: Resources, cost: Partial<Resources>): boolean {
   return (
     have.wood >= (cost.wood ?? 0) &&
     have.food >= (cost.food ?? 0) &&
-    have.gold >= (cost.gold ?? 0)
+    have.gold >= (cost.gold ?? 0) &&
+    have.stone >= (cost.stone ?? 0)
   );
 }
 
@@ -526,5 +534,6 @@ export function payCost(have: Resources, cost: Partial<Resources>): void {
   have.wood -= cost.wood ?? 0;
   have.food -= cost.food ?? 0;
   have.gold -= cost.gold ?? 0;
+  have.stone -= cost.stone ?? 0;
 }
 

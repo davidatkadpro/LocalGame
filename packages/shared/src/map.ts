@@ -100,6 +100,10 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
     placeNode(s.x - 1, s.y + 5, "gold");
     placeNode(s.x + 5, s.y + 5, "food");
     placeNode(s.x + 6, s.y + 5, "food");
+    // A little starter stone so an early defensive tower doesn't require a trek
+    // to the contested stone patches first.
+    placeNode(s.x - 3, s.y + 6, "stone");
+    placeNode(s.x - 2, s.y + 7, "stone");
   }
 
   // Scatter extra resources across the map to fight over (denser than before).
@@ -109,7 +113,8 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
     const y = rng.int(height);
     if (nearSpawn(x, y)) continue;
     const roll = rng.next();
-    const kind: ResourceKind = roll < 0.6 ? "wood" : roll < 0.82 ? "food" : "gold";
+    const kind: ResourceKind =
+      roll < 0.55 ? "wood" : roll < 0.75 ? "food" : roll < 0.9 ? "gold" : "stone";
     placeNode(x, y, kind);
   }
 
@@ -150,6 +155,24 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
     }
   }
 
+  // Stone deposits flanking the centre. Stone is the defensive resource (§7.4),
+  // so making it contested in the middle pulls players to fight over the map for
+  // fortification material instead of turtling on a safe corner patch.
+  for (const off of [-7, 7]) {
+    const sx = Math.floor(width / 2) + off;
+    const sy = Math.floor(height / 2);
+    const r = 2;
+    for (let y = sy - r; y <= sy + r; y++) {
+      for (let x = sx - r; x <= sx + r; x++) {
+        const dx = x - sx;
+        const dy = y - sy;
+        if (dx * dx + dy * dy > r * r) continue;
+        if (rng.next() < 0.5) continue; // scattered, not a solid slab
+        placeNode(x, y, "stone");
+      }
+    }
+  }
+
   // A handful of dense "resource sites" — clusters worth expanding to and
   // fighting over, rather than uniform scatter. Each is a single kind so a site
   // reads as "the gold patch", "the woods", etc.
@@ -158,7 +181,8 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
     const cx = rng.range(10, width - 10);
     const cy = rng.range(10, height - 10);
     const roll = rng.next();
-    const kind: ResourceKind = roll < 0.45 ? "wood" : roll < 0.75 ? "food" : "gold";
+    const kind: ResourceKind =
+      roll < 0.4 ? "wood" : roll < 0.65 ? "food" : roll < 0.85 ? "gold" : "stone";
     const nodes = 4 + rng.int(3); // 4–6 nodes
     for (let n = 0; n < nodes; n++) {
       const x = Math.round(cx + rng.range(-2, 2));

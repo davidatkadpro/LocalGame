@@ -30,7 +30,7 @@ function check(label: string, cond: boolean, detail = "") {
 }
 
 type World = ReturnType<typeof createWorld>;
-const rich = (p: Player) => (p.resources = { wood: 9999, food: 9999, gold: 9999 });
+const rich = (p: Player) => (p.resources = { wood: 9999, food: 9999, gold: 9999, stone: 9999 });
 function addBuilding(world: World, owner: number, type: BuildingType, x: number, y: number): Building {
   const b: Building = {
     id: world.nextEntityId++,
@@ -123,11 +123,11 @@ check(
   check("advance blocked without a prereq building", p.ageUpTimer === 0 && p.age === 0);
 
   addBuilding(world, 0, "storehouse", 1, 1); // Feudal prereq: an economy building
-  p.resources = { wood: 0, food: 0, gold: 0 };
+  p.resources = { wood: 0, food: 0, gold: 0, stone: 0 };
   applyCommand(world, 0, { c: "advanceAge", building: tc.id });
   check("advance blocked when unaffordable", p.ageUpTimer === 0);
 
-  p.resources = { wood: 0, food: 1000, gold: 1000 };
+  p.resources = { wood: 0, food: 1000, gold: 1000, stone: 0 };
   const foodBefore = p.resources.food;
   applyCommand(world, 0, { c: "advanceAge", building: tc.id });
   check("advance starts (timer set)", p.ageUpTimer === AGE_DEFS[1].advanceMs);

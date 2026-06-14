@@ -425,6 +425,7 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
       player.resources.wood += rdef.cost.wood ?? 0;
       player.resources.food += rdef.cost.food ?? 0;
       player.resources.gold += rdef.cost.gold ?? 0;
+      player.resources.stone += rdef.cost.stone ?? 0;
       if (b.queue.length === 0) b.produceTimer = 0;
       else if (idx === 0) b.produceTimer = UNIT_DEFS[b.queue[0]].trainMs; // restart the new front
       break;
@@ -517,6 +518,7 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
       player.resources.wood += Math.floor((cost.wood ?? 0) * 0.5);
       player.resources.food += Math.floor((cost.food ?? 0) * 0.5);
       player.resources.gold += Math.floor((cost.gold ?? 0) * 0.5);
+      player.resources.stone += Math.floor((cost.stone ?? 0) * 0.5);
       // A farm takes its hosted food node down with it.
       if (b.farmNodeId != null) {
         world.resourceNodes = world.resourceNodes.filter((n) => n.id !== b.farmNodeId);

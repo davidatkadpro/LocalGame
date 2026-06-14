@@ -3,7 +3,7 @@
 export type PlayerId = number; // 0..3 (game slot)
 export type EntityId = number;
 
-export type ResourceKind = "wood" | "food" | "gold";
+export type ResourceKind = "wood" | "food" | "gold" | "stone";
 export type Resources = Record<ResourceKind, number>;
 
 export type Terrain = "grass" | "water" | "forest" | "rock";
