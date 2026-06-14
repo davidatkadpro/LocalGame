@@ -78,6 +78,15 @@ export type UnitState =
   | "building"
   | "attacking";
 
+/** Per-unit combat posture, governing how it reacts to enemies when it isn't
+ *  executing an explicit order:
+ *   - aggressive:  seek and engage any foe in sight, chasing within a leash
+ *   - defensive:   fight back when attacked, leashed to sight (the default —
+ *                  reproduces the classic retaliate-but-don't-roam behaviour)
+ *   - standGround: attack only what is already in range; never take a step
+ *   - noAttack:    never auto-engage (hold fire); only explicit orders apply */
+export type Stance = "aggressive" | "defensive" | "standGround" | "noAttack";
+
 /** A queued order (shift-click). Executed in sequence once the unit goes idle. */
 export type QueuedOrder =
   | { k: "move"; tile: Vec2 }
@@ -116,6 +125,11 @@ export interface Unit {
   lastGatherNode: EntityId | null;
   /** queued orders (shift-click), executed in order once the unit goes idle */
   orders: QueuedOrder[];
+  /** combat posture: bounds auto-engage/chase when not under an explicit order */
+  stance: Stance;
+  /** patrol loop waypoints (tile coords); null = not patrolling. The unit walks
+   *  toward patrol[0] engaging any foe en route, then rotates the list to loop. */
+  patrol: Vec2[] | null;
 }
 
 export interface Building {

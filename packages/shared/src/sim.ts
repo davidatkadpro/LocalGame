@@ -167,6 +167,8 @@ function makeUnit(world: World, owner: PlayerId, type: UnitType, pos: Vec2): Uni
     retaliating: false,
     lastGatherNode: null,
     orders: [],
+    stance: "defensive",
+    patrol: null,
   };
 }
 
@@ -332,6 +334,7 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
         u.aggro = null;
         u.attackedBy = null;
         u.retaliating = false;
+        u.patrol = null;
         u.orders = [];
       }
       break;
@@ -506,7 +509,37 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
         u.aggro = { ...goal };
         u.attackedBy = null;
         u.retaliating = false;
+        u.patrol = null;
         u.path = findPath(world.map, u.pos, goal, buildingBlocker(world, undefined, u.owner));
+      }
+      break;
+    }
+    case "patrol": {
+      // Loop between two posts: the clicked tile and where the unit stands now.
+      // Engagement en route uses attack-move semantics (the moving state below),
+      // independent of stance; on arrival the waypoint list rotates to continue.
+      const target = { x: cmd.tile.x, y: cmd.tile.y };
+      for (const id of cmd.units) {
+        const u = unitById(world, id);
+        if (!u || u.owner !== playerId) continue;
+        u.orders = [];
+        const start = { x: Math.floor(u.pos.x), y: Math.floor(u.pos.y) };
+        u.patrol = [{ ...target }, start];
+        u.state = "moving";
+        u.targetEntity = null;
+        u.targetTile = { ...target };
+        u.aggro = tileCenterOf(target);
+        u.attackedBy = null;
+        u.retaliating = false;
+        u.path = findPath(world.map, u.pos, u.aggro, buildingBlocker(world, undefined, u.owner));
+      }
+      break;
+    }
+    case "setStance": {
+      for (const id of cmd.units) {
+        const u = unitById(world, id);
+        if (!u || u.owner !== playerId) continue;
+        u.stance = cmd.stance;
       }
       break;
     }
@@ -551,6 +584,7 @@ function orderMove(world: World, u: Unit, tile: Vec2) {
   u.aggro = null;
   u.attackedBy = null;
   u.retaliating = false;
+  u.patrol = null;
   u.repaths = 0;
   u.path = findPath(world.map, u.pos, tileCenterOf(tile), buildingBlocker(world, undefined, u.owner));
 }
@@ -596,6 +630,7 @@ function startOrder(world: World, u: Unit, order: QueuedOrder): void {
       u.aggro = { ...goal };
       u.attackedBy = null;
       u.retaliating = false;
+      u.patrol = null;
       u.path = findPath(world.map, u.pos, goal, buildingBlocker(world, undefined, u.owner));
       break;
     }
@@ -1023,7 +1058,21 @@ function updateUnit(world: World, u: Unit): void {
         startOrder(world, u, u.orders.shift()!);
         return;
       }
-      tryRetaliate(world, u);
+      // Posture-dependent idle behaviour. Defensive (default) only fights back
+      // when hit; aggressive also seeks foes in sight; stand-ground fires on
+      // anything already in range without moving; no-attack holds fire.
+      switch (u.stance) {
+        case "aggressive":
+          if (!tryAcquireAggressive(world, u)) tryRetaliate(world, u);
+          break;
+        case "standGround":
+          tryStandGround(world, u);
+          break;
+        case "noAttack":
+          break;
+        default: // "defensive"
+          tryRetaliate(world, u);
+      }
       return;
     case "moving": {
       // Attack-move: engage any enemy that comes into sight while travelling.
@@ -1056,10 +1105,22 @@ function updateUnit(world: World, u: Unit): void {
         u.stuck = 0;
         u.repaths = 0;
         if (u.aggro) {
-          // reached the attack-move destination (or gave up re-pathing to it)
-          u.aggro = null;
-          u.state = "idle";
-          u.targetTile = null;
+          if (u.patrol && u.patrol.length > 0) {
+            // Reached (or gave up reaching) a patrol post: rotate it to the back
+            // and strike out for the next, so the unit loops forever.
+            const reached = u.patrol.shift()!;
+            u.patrol.push(reached);
+            const next = u.patrol[0];
+            u.targetTile = { ...next };
+            u.aggro = tileCenterOf(next);
+            u.path = findPath(world.map, u.pos, u.aggro, buildingBlocker(world, undefined, u.owner));
+            // stay in "moving" — a patrol never falls idle on its own
+          } else {
+            // reached the attack-move destination (or gave up re-pathing to it)
+            u.aggro = null;
+            u.state = "idle";
+            u.targetTile = null;
+          }
         } else {
           onArrive(world, u);
         }
@@ -1523,15 +1584,22 @@ function doAttack(world: World, u: Unit): void {
     : distToBuilding(u.pos, targetBuilding!);
 
   if (range > def.range) {
-    // Auto-retaliation is leashed: stand and fight, but don't pursue a foe that
-    // has fled beyond our sight (otherwise units get kited across the map).
-    if (isRetaliation(u) && range > UNIT_DEFS[u.type].sight) {
-      u.targetEntity = null;
-      u.attackedBy = null;
-      u.retaliating = false;
-      u.state = "idle";
-      u.path = [];
-      return;
+    // Auto-engagements are leashed so units aren't kited across the map. The
+    // leash distance depends on stance: stand-ground never repositions for an
+    // auto target at all; aggressive chases twice as far as defensive before
+    // breaking off; defensive keeps the classic sight-distance leash.
+    if (isRetaliation(u)) {
+      const leash = u.stance === "standGround" ? 0 : u.stance === "aggressive"
+        ? UNIT_DEFS[u.type].sight * 2
+        : UNIT_DEFS[u.type].sight;
+      if (range > leash) {
+        u.targetEntity = null;
+        u.attackedBy = null;
+        u.retaliating = false;
+        u.state = "idle";
+        u.path = [];
+        return;
+      }
     }
     // close in
     u.path = findPath(
@@ -1601,6 +1669,47 @@ function tryRetaliate(world: World, u: Unit): void {
   u.targetEntity = foe.id;
   u.state = "attacking";
   u.retaliating = true; // leashed engagement (see isRetaliation / doAttack)
+  u.path = [];
+}
+
+/**
+ * Aggressive idle behaviour: lunge at the nearest foe in sight even if it never
+ * touched us. The engagement is flagged as auto (`retaliating`) so doAttack
+ * leashes the chase (twice sight) instead of pursuing across the map. Returns
+ * true if a target was acquired.
+ */
+function tryAcquireAggressive(world: World, u: Unit): boolean {
+  const tid = acquireTarget(world, u);
+  if (tid === null) return false;
+  u.targetEntity = tid;
+  u.state = "attacking";
+  u.retaliating = true;
+  u.path = [];
+  return true;
+}
+
+/**
+ * Stand-ground idle behaviour: attack the nearest enemy *already* within attack
+ * range, but never take a step — a foe out of range is ignored so the unit holds
+ * the line. The engagement is auto-flagged, so doAttack drops it (in place) the
+ * moment the target steps out of range.
+ */
+function tryStandGround(world: World, u: Unit): void {
+  const def = UNIT_DEFS[u.type];
+  let best: EntityId | null = null;
+  let bd = def.range;
+  for (const e of world.units) {
+    if (e.id === u.id || e.hp <= 0 || sameTeam(world, e.owner, u.owner)) continue;
+    const d = dist(u.pos, e.pos);
+    if (d <= bd) {
+      bd = d;
+      best = e.id;
+    }
+  }
+  if (best === null) return;
+  u.targetEntity = best;
+  u.state = "attacking";
+  u.retaliating = true;
   u.path = [];
 }
 
@@ -1751,6 +1860,8 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
         state: u.state,
         carry: u.carry ? u.carry.kind : null,
       };
+      // Own units carry their stance so the HUD can reflect the active posture.
+      if (u.owner === player) dto.stance = u.stance;
       // Own units carry their queued-order waypoints for the command-queue overlay.
       if (u.owner === player && u.orders.length > 0) {
         const pts = u.orders

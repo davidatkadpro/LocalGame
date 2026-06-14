@@ -9,6 +9,7 @@ import type {
   PlayerStats,
   Resources,
   ResourceKind,
+  Stance,
   UnitState,
   UnitType,
   UpgradeId,
@@ -58,6 +59,8 @@ export interface UnitDTO {
   carry: ResourceKind | null;
   /** queued-order waypoints (own units only) for drawing the command queue */
   orders?: { x: number; y: number }[];
+  /** combat posture (own units only) so the HUD can reflect the active stance */
+  stance?: Stance;
 }
 
 export interface BuildingDTO {
@@ -151,6 +154,8 @@ export type Command =
   | { c: "rally"; building: number; tile: Vec2 }
   | { c: "attack"; units: number[]; target: number; queue?: boolean }
   | { c: "attackMove"; units: number[]; tile: Vec2; queue?: boolean }
+  | { c: "patrol"; units: number[]; tile: Vec2 }
+  | { c: "setStance"; units: number[]; stance: Stance }
   | { c: "stop"; units: number[] }
   | { c: "demolish"; building: number }
   | { c: "concede" };
