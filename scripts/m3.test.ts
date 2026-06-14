@@ -619,5 +619,110 @@ function findOpenBlock(world: ReturnType<typeof createWorld>, size: number): { x
   check("an empty queue clears the produce timer", tc.produceTimer === 0);
 }
 
+// ---- 18. specialised camps: matching camp boosts its resource's gather ------
+{
+  // Drop a drop-off of `dropType` right beside the wood node farthest from the
+  // town center and measure how much wood a worker pulls in a fixed window. A
+  // lumber camp (boosts wood) should out-gather a plain storehouse by ~20%.
+  function woodCarriedWith(dropType: "storehouse" | "lumber_camp"): number | null {
+    const world = createWorld(7, [PS[0]]);
+    const fog = createFog(world);
+    const tc = world.buildings.find((b) => b.owner === 0 && b.type === "town_center")!;
+    const tcCenter = { x: tc.tile.x + 1.5, y: tc.tile.y + 1.5 };
+    let node = world.resourceNodes.find((n) => n.kind === "wood")!;
+    let far = -1;
+    for (const n of world.resourceNodes) {
+      if (n.kind !== "wood") continue;
+      const d = Math.hypot(n.tile.x - tcCenter.x, n.tile.y - tcCenter.y);
+      if (d > far) { far = d; node = n; }
+    }
+    const dTile = { x: node.tile.x + 2, y: node.tile.y };
+    const ok = [0, 1].every((dx) => [0, 1].every((dy) => isWalkable(world.map, dTile.x + dx, dTile.y + dy)));
+    if (far < 12 || !ok) return null;
+    const worker = world.units.find((u) => u.owner === 0 && u.type === "worker")!;
+    worker.pos = { x: node.tile.x + 0.5, y: node.tile.y + 0.5 }; // sit on the node
+    world.units = [worker];
+    world.buildings.push({
+      id: world.nextEntityId++, owner: 0, type: dropType, tile: dTile,
+      hp: BUILDING_DEFS[dropType].hp, progress: 1, queue: [], produceTimer: 0,
+      rally: null, research: null, researchTimer: 0, attackCooldown: 0,
+    });
+    applyCommand(world, 0, { c: "gather", units: [worker.id], node: node.id });
+    // 10 ticks (1s) — short enough that carry stays under CARRY_CAPACITY (no return trip).
+    for (let i = 0; i < 10; i++) tick(world, fog);
+    return worker.carry?.kind === "wood" ? worker.carry.amount : null;
+  }
+
+  const base = woodCarriedWith("storehouse");
+  const camp = woodCarriedWith("lumber_camp");
+  if (base == null || camp == null || base <= 0) {
+    console.log("CAMPS: SKIP (no suitable far wood node on seed)");
+  } else {
+    check("lumber camp out-gathers a plain storehouse for wood", camp > base, `camp=${camp.toFixed(2)} store=${base.toFixed(2)}`);
+    const ratio = camp / base;
+    check("camp wood bonus is ~+20%", Math.abs(ratio - 1.2) < 0.02, `ratio=${ratio.toFixed(3)}`);
+  }
+}
+
+// ---- 19. cavalry: trained at the Stable, and rides archers down (§7.8) ------
+{
+  const world = createWorld(7, [PS[0]]);
+  const fog = createFog(world);
+  const p = world.players[0];
+  p.age = 1; // Feudal: stable + cavalry unlocked
+  p.resources.wood = 9999; p.resources.food = 9999; p.resources.gold = 9999;
+  const stable = {
+    id: world.nextEntityId++, owner: 0, type: "stable" as const, tile: { x: 30, y: 30 },
+    hp: BUILDING_DEFS.stable.hp, progress: 1, queue: [], produceTimer: 0,
+    rally: null, research: null, researchTimer: 0, attackCooldown: 0,
+  };
+  world.buildings.push(stable);
+  const beforeIds = new Set(world.units.map((u) => u.id));
+  applyCommand(world, 0, { c: "train", building: stable.id, unit: "cavalry" });
+  check("stable accepts a cavalry order", stable.queue.length === 1);
+  for (let i = 0; i < Math.ceil(UNIT_DEFS.cavalry.trainMs / 100) + 3; i++) tick(world, fog);
+  const horse = world.units.find((u) => u.owner === 0 && u.type === "cavalry" && !beforeIds.has(u.id));
+  check("a cavalry unit pops from the stable", !!horse);
+  check("cavalry is faster than a worker (a raider)", UNIT_DEFS.cavalry.speed > UNIT_DEFS.worker.speed);
+
+  // Age-gate: a Dark-Age player can't train cavalry even with a stable present.
+  const dark = createWorld(7, [PS[0]]);
+  const ds = { ...stable, id: dark.nextEntityId++ };
+  dark.buildings.push(ds);
+  dark.players[0].resources = { wood: 9999, food: 9999, gold: 9999 };
+  applyCommand(dark, 0, { c: "train", building: ds.id, unit: "cavalry" });
+  check("cavalry is age-gated (no Dark-Age training)", ds.queue.length === 0);
+}
+
+// ---- 19b. counter triangle: cavalry mauls archers, soldiers brace cavalry ---
+{
+  const world = createWorld(7, [PS[0], PS[1]]);
+  const fog = createFog(world);
+  const proto = world.units.find((u) => u.owner === 0 && u.type === "worker")!;
+  const big = (owner: number, type: "cavalry" | "archer" | "soldier", x: number, y: number) => ({
+    ...proto, id: world.nextEntityId++, owner, type, hp: 5000,
+    pos: { x, y }, state: "idle" as const, path: [], targetEntity: null,
+  });
+  // Two identical cavalry, one onto an archer, one onto a soldier; inflated hp
+  // so nobody dies in the window — we compare damage dealt, isolating the counter.
+  const cavA = big(0, "cavalry", 20, 20);
+  const cavB = big(0, "cavalry", 20, 40);
+  const arc = big(1, "archer", 20.7, 20);
+  const sol = big(1, "soldier", 20.7, 40);
+  // A soldier of ours onto a third cavalry, to confirm the reverse leg.
+  const mySol = big(0, "soldier", 20, 60);
+  const enemyCav = big(1, "cavalry", 20.7, 60);
+  world.units = [cavA, cavB, arc, sol, mySol, enemyCav];
+  applyCommand(world, 0, { c: "attack", units: [cavA.id], target: arc.id });
+  applyCommand(world, 0, { c: "attack", units: [cavB.id], target: sol.id });
+  applyCommand(world, 0, { c: "attack", units: [mySol.id], target: enemyCav.id });
+  for (let i = 0; i < 60; i++) tick(world, fog);
+  const dmgArcher = 5000 - arc.hp; // cavalry → archer (×1.5 counter)
+  const dmgSoldier = 5000 - sol.hp; // cavalry → soldier (×1)
+  const dmgEnemyCav = 5000 - enemyCav.hp; // soldier → cavalry (×1.5 anti-cavalry)
+  check("cavalry rides archers down harder than soldiers (counter)", dmgArcher > dmgSoldier, `arc=${dmgArcher} sol=${dmgSoldier}`);
+  check("a soldier out-trades a cavalry (anti-cavalry bonus)", dmgEnemyCav > dmgSoldier, `sol→cav=${dmgEnemyCav} cav→sol=${dmgSoldier}`);
+}
+
 console.log(pass ? "M3: PASS ✅" : "M3: FAIL ❌");
 process.exit(pass ? 0 : 1);

@@ -86,6 +86,20 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     trainedAt: "barracks",
     minAge: 1, // Feudal
   },
+  cavalry: {
+    type: "cavalry",
+    hp: 100,
+    speed: 3.0, // fastest unit: a raider that runs workers and archers down
+    sight: 7,
+    cost: { food: 70, gold: 30 }, // gold-gated raider trained at the Stable
+    popCost: 1,
+    trainMs: 11000,
+    damage: 12,
+    range: 0.8, // melee
+    attackMs: 1000,
+    trainedAt: "stable",
+    minAge: 1, // Feudal
+  },
   ram: {
     type: "ram",
     hp: 120,
@@ -103,7 +117,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
 };
 
 /** Unit types that count as military (for combat upgrades). */
-export const MILITARY: UnitType[] = ["soldier", "archer", "ram"];
+export const MILITARY: UnitType[] = ["soldier", "archer", "cavalry", "ram"];
 
 export interface BuildingDef {
   type: BuildingType;
@@ -169,6 +183,19 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     buildable: true,
     minAge: 1, // Feudal
   },
+  stable: {
+    type: "stable",
+    hp: 600,
+    sight: 5,
+    size: { w: 3, h: 3 },
+    cost: { wood: 175 },
+    buildMs: 20000,
+    providesPop: 0,
+    isDropOff: false,
+    canTrain: ["cavalry"], // mounted raiders: fast eco harassment, weak to soldiers
+    buildable: true,
+    minAge: 1, // Feudal
+  },
   tower: {
     type: "tower",
     hp: 500,
@@ -194,6 +221,47 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     buildMs: 10000,
     providesPop: 0,
     isDropOff: true, // forward drop-off so far resource patches are worth working
+    canTrain: [],
+    buildable: true,
+  },
+  // Specialised drop-off camps: a forward drop-off like the storehouse, but each
+  // also grants a +gather bonus (CAMP_GATHER_BONUS) for ITS resource when it is
+  // the worker's nearest drop-off. Costs a touch more than the generic storehouse,
+  // so placement (right camp by the right patch) is a real eco decision. See
+  // CAMP_RESOURCE / campBonusFor below.
+  lumber_camp: {
+    type: "lumber_camp",
+    hp: 250,
+    sight: 3,
+    size: { w: 2, h: 2 },
+    cost: { wood: 75 },
+    buildMs: 10000,
+    providesPop: 0,
+    isDropOff: true,
+    canTrain: [],
+    buildable: true,
+  },
+  mining_camp: {
+    type: "mining_camp",
+    hp: 250,
+    sight: 3,
+    size: { w: 2, h: 2 },
+    cost: { wood: 75 },
+    buildMs: 10000,
+    providesPop: 0,
+    isDropOff: true,
+    canTrain: [],
+    buildable: true,
+  },
+  mill: {
+    type: "mill",
+    hp: 250,
+    sight: 3,
+    size: { w: 2, h: 2 },
+    cost: { wood: 75 },
+    buildMs: 10000,
+    providesPop: 0,
+    isDropOff: true,
     canTrain: [],
     buildable: true,
   },
@@ -357,6 +425,22 @@ export function gatherRate(p: Player): number {
   return GATHER_PER_SEC * (hasUpgrade(p, "improvedTools") ? 1.5 : 1) * AGE_GATHER_MULT[p.age ?? 0];
 }
 
+/** Resource each specialised drop-off camp is themed around and boosts. */
+export const CAMP_RESOURCE: Partial<Record<BuildingType, ResourceKind>> = {
+  lumber_camp: "wood",
+  mining_camp: "gold",
+  mill: "food",
+};
+
+/** Bonus a matching camp applies to its resource's gather rate. */
+export const CAMP_GATHER_BONUS = 1.2; // +20%
+
+/** Gather-rate multiplier a drop-off of `type` grants for harvesting `kind`
+ *  (1 = no bonus). Only specialised camps boost their own resource. */
+export function campBonusFor(type: BuildingType, kind: ResourceKind): number {
+  return CAMP_RESOURCE[type] === kind ? CAMP_GATHER_BONUS : 1;
+}
+
 /** Damage a unit of `type` owned by `p` deals (before target armor). */
 export function unitDamage(p: Player, type: UnitType): number {
   const base = UNIT_DEFS[type].damage;
@@ -382,12 +466,15 @@ export function incomingDamage(target: Player, type: UnitType, dmg: number): num
 const DAMAGE_COUNTERS: Partial<
   Record<UnitType, Partial<Record<UnitType | "building", number>>>
 > = {
-  // Soldiers run down archers and rams.
-  soldier: { archer: 1.5, ram: 1.5 },
+  // Soldiers (infantry) run down archers and rams, and brace against cavalry.
+  soldier: { archer: 1.5, cavalry: 1.5, ram: 1.5 },
   // Archers shred soldiers/rams at range, harass workers, weak on structures.
   archer: { soldier: 1.75, ram: 1.5, worker: 1.25, building: 0.5 },
+  // Cavalry: a raider — rides down archers and workers, but soldiers counter it
+  // and it can't besiege (closes the triangle: soldier > cavalry > archer > soldier).
+  cavalry: { archer: 1.5, worker: 1.5, building: 0.5 },
   // Rams demolish buildings/walls but are near-useless against units (needs an escort).
-  ram: { worker: 0.34, soldier: 0.34, archer: 0.34, ram: 0.34, building: 5 },
+  ram: { worker: 0.34, soldier: 0.34, archer: 0.34, cavalry: 0.34, ram: 0.34, building: 5 },
 };
 
 export function damageMultiplier(attacker: UnitType, target: UnitType | "building"): number {

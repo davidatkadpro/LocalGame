@@ -13,6 +13,7 @@ import {
   TICK_DT,
   UNIT_DEFS,
   UPGRADE_DEFS,
+  campBonusFor,
   canAfford,
   damageMultiplier,
   emptyResources,
@@ -1286,7 +1287,11 @@ function doGather(world: World, u: Unit): void {
   }
   u.lastGatherNode = node.id; // remember it so we can resume after a build detour
   if (!u.carry || u.carry.kind !== node.kind) u.carry = { kind: node.kind, amount: 0 };
-  const rate = gatherRate(world.players[u.owner]);
+  // A specialised camp boosts its resource when it's the nearest drop-off, so
+  // placing the right camp by the right patch pays off (§7.2).
+  const drop = nearestDropOff(world, u.owner, u.pos);
+  const camp = drop ? campBonusFor(drop.type, node.kind) : 1;
+  const rate = gatherRate(world.players[u.owner]) * camp;
   const take = Math.min(rate * TICK_DT, node.amount, CARRY_CAPACITY - u.carry.amount);
   node.amount -= take;
   u.carry.amount += take;

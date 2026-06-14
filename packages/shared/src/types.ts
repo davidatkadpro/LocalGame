@@ -8,13 +8,17 @@ export type Resources = Record<ResourceKind, number>;
 
 export type Terrain = "grass" | "water" | "forest" | "rock";
 
-export type UnitType = "worker" | "soldier" | "archer" | "ram";
+export type UnitType = "worker" | "soldier" | "archer" | "cavalry" | "ram";
 export type BuildingType =
   | "town_center"
   | "house"
   | "barracks"
+  | "stable"
   | "tower"
   | "storehouse"
+  | "lumber_camp"
+  | "mining_camp"
+  | "mill"
   | "farm"
   | "wall"
   | "gate"

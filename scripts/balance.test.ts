@@ -66,6 +66,26 @@ check(
   `s→a=${ttk("soldier", "archer").toFixed(1)}s a→s=${ttk("archer", "soldier").toFixed(1)}s`,
 );
 
+// ---- 2b. cavalry closes the triangle: soldier > cavalry > archer > soldier --
+check("cavalry get an anti-archer bonus", damageMultiplier("cavalry", "archer") > 1);
+check("cavalry harass workers", damageMultiplier("cavalry", "worker") > 1);
+check("cavalry can't besiege (anti-building penalty)", damageMultiplier("cavalry", "building") < 1);
+check("soldiers brace against cavalry", damageMultiplier("soldier", "cavalry") > 1);
+check(
+  "a soldier out-trades a cavalry in melee (counter)",
+  dps("soldier", "cavalry") > dps("cavalry", "soldier"),
+  `soldier=${dps("soldier", "cavalry").toFixed(1)} cavalry=${dps("cavalry", "soldier").toFixed(1)}`,
+);
+check(
+  "cavalry shred archers faster than archers kite them",
+  dps("cavalry", "archer") > dps("archer", "cavalry"),
+  `cav→arc=${dps("cavalry", "archer").toFixed(1)} arc→cav=${dps("archer", "cavalry").toFixed(1)}`,
+);
+check(
+  "cavalry is the fastest unit (a raider)",
+  UNIT_DEFS.cavalry.speed > Math.max(UNIT_DEFS.worker.speed, UNIT_DEFS.soldier.speed, UNIT_DEFS.archer.speed),
+);
+
 // ---- 3. siege identity: rams wreck buildings, whiff on units ----------------
 check("ram has a heavy anti-building multiplier", damageMultiplier("ram", "building") >= 5);
 check(
