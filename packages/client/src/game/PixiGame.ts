@@ -5,6 +5,7 @@ import { Application, Container, Graphics, Sprite } from "pixi.js";
 import {
   ANIMAL_DEFS,
   BUILDING_DEFS,
+  RESOURCE_NODE_AMOUNT,
   TICK_MS,
   UNIT_DEFS,
   base64ToBytes,
@@ -80,6 +81,9 @@ export class PixiGame {
   private unitSprites = new Map<number, Sprite>();
   private buildingSprites = new Map<number, Sprite>();
   private resourceSprites = new Map<number, Sprite>();
+  // Largest amount seen per resource node, so depletion scales even for carcasses
+  // (whose full size isn't a fixed constant).
+  private resourceMax = new Map<number, number>();
   private animalSprites = new Map<number, Sprite>();
   private animalFx = new Map<number, { hp: number; flashUntil: number }>();
 
@@ -555,18 +559,32 @@ export class PixiGame {
               : "food";
         sp = new Sprite(textures[key]);
         sp.anchor.set(0.5);
-        const s = n.carcass ? 0.72 : 0.95; // a meat pile reads a touch smaller
-        sp.width = s;
-        sp.height = s;
         this.resourceLayer.addChild(sp);
         this.resourceSprites.set(n.id, sp);
       }
       sp.position.set(n.tx + 0.5, n.ty + 0.5);
+
+      // Shrink + fade a node as it's mined out, so a patch running low reads at a
+      // glance. The "full" size is the largest amount we've ever seen for it
+      // (spawn maximum for normal nodes; first-seen amount for carcasses).
+      const max = Math.max(
+        this.resourceMax.get(n.id) ?? 0,
+        n.amount,
+        n.carcass ? 0 : RESOURCE_NODE_AMOUNT[n.kind],
+      );
+      this.resourceMax.set(n.id, max);
+      const ratio = max > 0 ? Math.max(0, Math.min(1, n.amount / max)) : 1;
+      const base = n.carcass ? 0.72 : 0.95;
+      const s = base * (0.55 + 0.45 * ratio);
+      sp.width = s;
+      sp.height = s;
+      sp.alpha = 0.8 + 0.2 * ratio;
     }
     for (const [id, sp] of this.resourceSprites) {
       if (!seen.has(id)) {
         sp.destroy();
         this.resourceSprites.delete(id);
+        this.resourceMax.delete(id);
       }
     }
   }
