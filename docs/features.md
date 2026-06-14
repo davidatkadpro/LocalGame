@@ -645,7 +645,7 @@ timber stable) with team-colour accents. Covered by `scripts/m3.test.ts` §19/§
 (trains from the stable, age-gated, rides archers down harder than soldiers,
 soldiers out-trade it) and 7 new guardrails in `scripts/balance.test.ts`.
 
-### 7.9 Unit stances + patrol  — 🔨 **M**
+### 7.9 Unit stances + patrol  — ✅ **M**
 
 **Have today.** Formation moves/stop and idle auto-retaliation (§1.1, §1.4 ✅).
 **Add.** Per-unit **stance** (Aggressive / Defensive / Stand-Ground / No-Attack)
@@ -655,6 +655,19 @@ between waypoints). The difference between army micro and chaos.
 [sim.ts](packages/shared/src/sim.ts) (chase leash + patrol),
 [protocol.ts](packages/shared/src/protocol.ts),
 [Hud.tsx](packages/client/src/ui/Hud.tsx) (4 toggles + patrol button).
+**Status.** ✅ — each unit carries a `stance` (default **defensive** =
+the pre-existing retaliate-when-hit-leashed-to-sight behaviour, so nothing else
+changed). **Aggressive** also seeks foes in sight and chases within a 2×sight
+leash; **stand-ground** attacks only what is already in attack range and never
+takes a step; **no-attack** holds fire entirely (even when struck). The posture
+only governs *idle* behaviour — explicit attack/attack-move orders still chase as
+before. **Patrol** loops a unit between the clicked post and where it stood,
+engaging anything en route (attack-move semantics) and rotating its two-waypoint
+list on each arrival so it never falls idle; any fresh order cancels it. Stance
+rides in the snapshot for own units so the HUD's 4-way toggle row reflects the
+selection's posture; patrol arms like attack-move (HUD button or **P**, then
+click). Sim-tested in [stances.test.ts](scripts/stances.test.ts) (24 checks).
+Map objectives (§7.10) remain the last open item in this batch.
 
 ### 7.10 Map objectives — Relics & a Wonder victory  — 🆕 **L**
 

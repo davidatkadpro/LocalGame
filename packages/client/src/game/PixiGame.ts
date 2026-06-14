@@ -18,6 +18,7 @@ import {
   type Command,
   type GameMap,
   type Snapshot,
+  type Stance,
   type Terrain,
   type UnitDTO,
   type UnitType,
@@ -106,6 +107,7 @@ export class PixiGame {
   // While placing a wall, the tile a drag started on — a drag lays a whole line.
   private wallDragStart: { x: number; y: number } | null = null;
   private armedAttack = false; // attack-move: next click issues an attack-move
+  private armedPatrol = false; // patrol: next click issues a looping patrol order
 
   // control groups (keyboard 1–9) and idle-worker cycling
   private groups = new Map<number, number[]>();
@@ -213,6 +215,7 @@ export class PixiGame {
     this.wallDragStart = null;
     if (b) {
       this.armedAttack = false;
+      this.armedPatrol = false;
       this.disarmSelectMode();
     }
   }
@@ -235,8 +238,25 @@ export class PixiGame {
   armAttackMove(): void {
     if (this.selected.size === 0) return;
     this.armedAttack = true;
+    this.armedPatrol = false;
     this.placing = null;
     this.disarmSelectMode();
+  }
+
+  /** Arm patrol: the next map click sets a looping patrol for the selection. */
+  armPatrol(): void {
+    if (this.selected.size === 0) return;
+    this.armedPatrol = true;
+    this.armedAttack = false;
+    this.placing = null;
+    this.disarmSelectMode();
+  }
+
+  /** Set the combat stance (posture) of the current unit selection. */
+  setStance(stance: Stance): void {
+    if (this.selected.size === 0) return;
+    this.send({ c: "setStance", units: [...this.selected], stance });
+    sfx.command();
   }
 
   /** Arm touch box-select: the next single-finger drag draws a selection box. */
@@ -244,6 +264,7 @@ export class PixiGame {
     this.selectMode = true;
     this.placing = null;
     this.armedAttack = false;
+    this.armedPatrol = false;
     useStore.getState().setSelectArmed(true);
   }
 
@@ -1211,6 +1232,9 @@ export class PixiGame {
     if (k === "a") {
       this.armAttackMove();
       e.preventDefault();
+    } else if (k === "p") {
+      this.armPatrol();
+      e.preventDefault();
     } else if (k === "s") {
       this.stopSelected();
       e.preventDefault();
@@ -1225,6 +1249,7 @@ export class PixiGame {
       e.preventDefault();
     } else if (k === "escape") {
       this.armedAttack = false;
+      this.armedPatrol = false;
       this.placing = null;
       this.wallDragStart = null;
       this.selectSingle(null, null);
@@ -1310,6 +1335,8 @@ export class PixiGame {
       } else if (e.button === 0) {
         if (this.armedAttack) {
           this.issueAttackMove(this.screenToWorld(x, y));
+        } else if (this.armedPatrol) {
+          this.issuePatrol(this.screenToWorld(x, y));
         } else if (this.placing && isWall(this.placing)) {
           this.wallDragStart = this.floorTile(this.screenToWorld(x, y)); // drag = line
         } else if (this.placing) {
@@ -1446,6 +1473,8 @@ export class PixiGame {
         const wp = this.screenToWorld(info.x, info.y);
         if (this.armedAttack) {
           this.issueAttackMove(wp);
+        } else if (this.armedPatrol) {
+          this.issuePatrol(wp);
         } else if (this.placing) {
           this.tryPlace(wp);
         } else {
@@ -1490,6 +1519,8 @@ export class PixiGame {
     if (this.pointers.size !== 1) return; // a second finger / lift cancels it
     if (this.armedAttack) {
       this.issueAttackMove(wp);
+    } else if (this.armedPatrol) {
+      this.issuePatrol(wp);
     } else if (this.placing) {
       this.tryPlace(wp);
     } else if (this.selected.size > 0 || this.selectedBuilding !== null) {
@@ -1799,6 +1830,18 @@ export class PixiGame {
       units: [...this.selected],
       tile: { x: Math.floor(wp.x), y: Math.floor(wp.y) },
       queue: keys.has("shift"),
+    });
+  }
+
+  /** Issue a patrol loop for the current selection and disarm. */
+  private issuePatrol(wp: { x: number; y: number }): void {
+    this.armedPatrol = false;
+    if (this.selected.size === 0) return;
+    sfx.command();
+    this.send({
+      c: "patrol",
+      units: [...this.selected],
+      tile: { x: Math.floor(wp.x), y: Math.floor(wp.y) },
     });
   }
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { BuildingType } from "@bg/shared";
+import type { BuildingType, Stance } from "@bg/shared";
 import { PixiGame } from "../game/PixiGame";
 import { Hud } from "./Hud";
 import { Minimap } from "./Minimap";
@@ -26,6 +26,8 @@ export function Game() {
 
   const onPlace = (b: BuildingType) => gameRef.current?.setPlacing(b);
   const onAttackMove = () => gameRef.current?.armAttackMove();
+  const onPatrol = () => gameRef.current?.armPatrol();
+  const onStance = (s: Stance) => gameRef.current?.setStance(s);
   const onStop = () => gameRef.current?.stopSelected();
   const onIdleWorker = () => gameRef.current?.selectNextIdleWorker();
   const onSelectMode = () => gameRef.current?.armSelectMode();
@@ -40,6 +42,8 @@ export function Game() {
       <Hud
         onPlace={onPlace}
         onAttackMove={onAttackMove}
+        onPatrol={onPatrol}
+        onStance={onStance}
         onStop={onStop}
         onIdleWorker={onIdleWorker}
         onSelectMode={onSelectMode}

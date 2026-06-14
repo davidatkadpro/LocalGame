@@ -4,6 +4,7 @@ import type {
   BuildingType,
   EntityId,
   Resources,
+  Stance,
   UnitType,
   UpgradeId,
 } from "@bg/shared";
@@ -24,6 +25,8 @@ import { isMuted, toggleMuted } from "../game/audio";
 interface HudProps {
   onPlace: (b: BuildingType) => void;
   onAttackMove: () => void;
+  onPatrol: () => void;
+  onStance: (s: Stance) => void;
   onStop: () => void;
   onIdleWorker: () => void;
   onSelectMode: () => void;
@@ -78,11 +81,21 @@ const BUILDING_HINT: Partial<Record<BuildingType, string>> = {
   fortified_wall: "Toughest wall, shrugs off rams (lots of stone) — drag a line",
 };
 
+// Combat postures, shown as a highlight-the-active toggle row in Commands.
+const STANCES: { id: Stance; icon: string; title: string }[] = [
+  { id: "aggressive", icon: "⚔", title: "Aggressive — seek and engage any enemy in sight, chasing within a leash" },
+  { id: "defensive", icon: "🛡", title: "Defensive — fight back when attacked, but don't roam (default)" },
+  { id: "standGround", icon: "🧍", title: "Stand Ground — hold position; attack only what comes into range" },
+  { id: "noAttack", icon: "🚫", title: "No Attack — hold fire; never auto-engage, even when hit" },
+];
+
 type MobileTab = "build" | "commands" | "selection" | "controls";
 
 export function Hud({
   onPlace,
   onAttackMove,
+  onPatrol,
+  onStance,
   onStop,
   onIdleWorker,
   onSelectMode,
@@ -122,6 +135,14 @@ export function Hud({
   const idleWorkers = snap
     ? snap.units.filter((u) => u.owner === me && u.type === "worker" && u.state === "idle").length
     : 0;
+  // Reflect the selection's posture in the stance toggles — only when uniform.
+  const selStances = snap
+    ? snap.units.filter((u) => u.owner === me && selectedUnits.includes(u.id)).map((u) => u.stance)
+    : [];
+  const activeStance: Stance | null =
+    selStances.length > 0 && selStances.every((s) => s === selStances[0])
+      ? selStances[0] ?? null
+      : null;
 
   const building = snap?.buildings.find((b) => b.id === selectedBuilding) ?? null;
 
@@ -189,6 +210,9 @@ export function Hud({
         <MobileBottom
           onPlace={onPlace}
           onAttackMove={onAttackMove}
+          onPatrol={onPatrol}
+          onStance={onStance}
+          stance={activeStance}
           onStop={onStop}
           onIdleWorker={onIdleWorker}
           onSelectMode={onSelectMode}
@@ -211,6 +235,9 @@ export function Hud({
             selectArmed={selectArmed}
             onSelectMode={onSelectMode}
             onAttackMove={onAttackMove}
+            onPatrol={onPatrol}
+            onStance={onStance}
+            stance={activeStance}
             onStop={onStop}
             selectedCount={selectedUnits.length}
             onIdleWorker={onIdleWorker}
@@ -299,6 +326,9 @@ function CommandsPanelView({
   selectArmed,
   onSelectMode,
   onAttackMove,
+  onPatrol,
+  onStance,
+  stance,
   onStop,
   selectedCount,
   onIdleWorker,
@@ -308,6 +338,9 @@ function CommandsPanelView({
   selectArmed: boolean;
   onSelectMode: () => void;
   onAttackMove: () => void;
+  onPatrol: () => void;
+  onStance: (s: Stance) => void;
+  stance: Stance | null;
   onStop: () => void;
   selectedCount: number;
   onIdleWorker: () => void;
@@ -330,6 +363,26 @@ function CommandsPanelView({
       <button onClick={onStop} disabled={selectedCount === 0}>
         ✋ Stop <span className="muted small">(S)</span>
       </button>
+      <button onClick={onPatrol} disabled={selectedCount === 0}>
+        🔁 Patrol <span className="muted small">(P)</span>
+      </button>
+      <div className="muted small" style={{ marginTop: 4 }}>
+        Stance
+      </div>
+      <div style={{ display: "flex", gap: 4 }}>
+        {STANCES.map((s) => (
+          <button
+            key={s.id}
+            style={{ flex: 1, minWidth: 0, padding: "4px 0" }}
+            className={stance === s.id ? "armed" : ""}
+            onClick={() => onStance(s.id)}
+            disabled={selectedCount === 0}
+            title={s.title}
+          >
+            {s.icon}
+          </button>
+        ))}
+      </div>
       <button onClick={onIdleWorker} disabled={idleWorkers === 0}>
         💤 Idle worker{idleWorkers > 0 ? ` (${idleWorkers})` : ""}{" "}
         <span className="muted small">(.)</span>
@@ -477,6 +530,9 @@ function ControlsPanelView({
 function MobileBottom({
   onPlace,
   onAttackMove,
+  onPatrol,
+  onStance,
+  stance,
   onStop,
   onIdleWorker,
   onSelectMode,
@@ -494,6 +550,9 @@ function MobileBottom({
 }: {
   onPlace: (b: BuildingType) => void;
   onAttackMove: () => void;
+  onPatrol: () => void;
+  onStance: (s: Stance) => void;
+  stance: Stance | null;
   onStop: () => void;
   onIdleWorker: () => void;
   onSelectMode: () => void;
@@ -539,6 +598,9 @@ function MobileBottom({
               selectArmed={selectArmed}
               onSelectMode={onSelectMode}
               onAttackMove={onAttackMove}
+              onPatrol={onPatrol}
+              onStance={onStance}
+              stance={stance}
               onStop={onStop}
               selectedCount={selectedCount}
               onIdleWorker={onIdleWorker}
