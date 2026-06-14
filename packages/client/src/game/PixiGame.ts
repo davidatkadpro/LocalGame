@@ -89,6 +89,9 @@ export class PixiGame {
   // Last auto-tile skin (variant key + rotation + scale) applied to each wall/gate
   // sprite, so we only re-texture when its neighbours actually change.
   private wallSkin = new Map<number, string>();
+  // Extra "arm" sprites for mixed diagonal⇄orthogonal junctions (one per
+  // connection beyond the base sprite), keyed by building id.
+  private wallStubs = new Map<number, Sprite[]>();
   private resourceSprites = new Map<number, Sprite>();
   // Largest amount seen per resource node, so depletion scales even for carcasses
   // (whose full size isn't a fixed constant).
@@ -526,21 +529,20 @@ export class PixiGame {
     this.ownUnitsInit = true;
   }
 
-  /** Auto-tile a wall/gate from its same-owner wall-like neighbours: returns the
-   *  variant sprite key, rotation (radians, clockwise), and scale (in tiles).
-   *  Orthogonal runs use the post/end/straight/corner/tee/cross set; a tile with
-   *  only diagonal neighbours uses a √2-scaled straight/end rotated 45° so a
-   *  diagonal staircase reads as one continuous wall. */
-  private wallVariant(b: BuildingDTO, snap: Snapshot): { key: SpriteKey; rot: number; scale: number } {
+  /** Auto-tile a wall/gate from its same-owner wall-like neighbours. Returns the
+   *  base variant sprite (key + rotation + scale, in tiles) and, for a mixed
+   *  diagonal⇄orthogonal junction, extra `stubs` — one "arm" per remaining
+   *  connection, rendered as sibling sprites so every direction (orthogonal and
+   *  45° diagonal) joins through a shared hub. `wallSet` indexes wall/gate tiles
+   *  by `owner:x:y` for O(1) neighbour lookups. */
+  private wallVariant(
+    b: BuildingDTO,
+    wallSet: Set<string>,
+  ): { key: SpriteKey; rot: number; scale: number; stubs?: { rot: number; scale: number }[] } {
     const H = Math.PI / 2;
-    const at = (dx: number, dy: number) =>
-      snap.buildings.some(
-        (o) =>
-          o.owner === b.owner &&
-          (o.type === "wall" || o.type === "gate") &&
-          o.tx === b.tx + dx &&
-          o.ty === b.ty + dy,
-      );
+    const D = Math.PI / 4;
+    const S2 = Math.SQRT2;
+    const at = (dx: number, dy: number) => wallSet.has(`${b.owner}:${b.tx + dx}:${b.ty + dy}`);
     const N = at(0, -1);
     const E = at(1, 0);
     const S = at(0, 1);
@@ -551,7 +553,32 @@ export class PixiGame {
       return { key: "gate", rot: vertical ? H : 0, scale: 1 };
     }
 
+    // Diagonal neighbours that connect *only* diagonally (both flanking
+    // orthogonal tiles empty) — the true-diagonal connections, each an arm
+    // reaching √2 to the shared corner.
+    const diagArms: { rot: number; scale: number }[] = [];
+    if (at(1, -1) && !N && !E) diagArms.push({ rot: -D, scale: S2 }); // NE
+    if (at(1, 1) && !S && !E) diagArms.push({ rot: D, scale: S2 }); // SE
+    if (at(-1, 1) && !S && !W) diagArms.push({ rot: 3 * D, scale: S2 }); // SW
+    if (at(-1, -1) && !N && !W) diagArms.push({ rot: -3 * D, scale: S2 }); // NW
+
     const mask = (N ? 1 : 0) | (E ? 2 : 0) | (S ? 4 : 0) | (W ? 8 : 0);
+
+    // Mixed junction: orthogonal arm(s) AND a diagonal arm meet here. Assemble it
+    // from one end-cap arm per connection (their inner ends overlap into a hub),
+    // so the diagonal no longer gets dropped where it meets a straight run.
+    if (mask !== 0 && diagArms.length > 0) {
+      const arms: { rot: number; scale: number }[] = [];
+      if (N) arms.push({ rot: -H, scale: 1 });
+      if (E) arms.push({ rot: 0, scale: 1 });
+      if (S) arms.push({ rot: H, scale: 1 });
+      if (W) arms.push({ rot: 2 * H, scale: 1 });
+      arms.push(...diagArms);
+      const [first, ...rest] = arms;
+      return { key: "wall_end", rot: first.rot, scale: first.scale, stubs: rest };
+    }
+
+    // Pure orthogonal — the pre-baked variants.
     switch (mask) {
       // end-caps (one side) — default stub points E
       case 2: return { key: "wall_end", rot: 0, scale: 1 }; // E
@@ -577,28 +604,58 @@ export class PixiGame {
 
     // No orthogonal neighbours → true diagonal segments (cosmetic; collision is
     // still per-tile). Pure diagonal runs are the target case.
-    const NE = at(1, -1);
-    const SE = at(1, 1);
-    const SW = at(-1, 1);
-    const NW = at(-1, -1);
-    const D = Math.PI / 4;
-    const S2 = Math.SQRT2;
-    if (NE && SW && !SE && !NW) return { key: "wall_straight", rot: -D, scale: S2 }; // NE–SW
-    if (NW && SE && !NE && !SW) return { key: "wall_straight", rot: D, scale: S2 }; // NW–SE
-    const diag = (NE ? 1 : 0) + (SE ? 1 : 0) + (SW ? 1 : 0) + (NW ? 1 : 0);
-    if (diag === 1) {
-      if (NE) return { key: "wall_end", rot: -D, scale: S2 };
-      if (SE) return { key: "wall_end", rot: D, scale: S2 };
-      if (SW) return { key: "wall_end", rot: 3 * D, scale: S2 };
-      return { key: "wall_end", rot: -3 * D, scale: S2 }; // NW
+    const has = (rot: number) => diagArms.some((a) => a.rot === rot);
+    if (has(-D) && has(3 * D) && !has(D) && !has(-3 * D)) return { key: "wall_straight", rot: -D, scale: S2 }; // NE–SW
+    if (has(-3 * D) && has(D) && !has(-D) && !has(3 * D)) return { key: "wall_straight", rot: D, scale: S2 }; // NW–SE
+    if (diagArms.length === 1) return { key: "wall_end", rot: diagArms[0].rot, scale: S2 };
+    if (diagArms.length > 1) {
+      const [first, ...rest] = diagArms;
+      return { key: "wall_end", rot: first.rot, scale: first.scale, stubs: rest };
     }
-    // isolated (or an ambiguous diagonal cluster) → the standalone post
+    // isolated → the standalone post
     return { key: "wall", rot: 0, scale: 1 };
+  }
+
+  /** Create/destroy/place the sibling "arm" sprites for a mixed wall junction.
+   *  They live on the entity layer (not as children of the base sprite) so the
+   *  base's own rotation/scale can't distort them. */
+  private syncWallStubs(
+    id: number,
+    cx: number,
+    cy: number,
+    z: number,
+    stubs: { rot: number; scale: number }[],
+  ): void {
+    let arr = this.wallStubs.get(id);
+    if (!arr) {
+      arr = [];
+      this.wallStubs.set(id, arr);
+    }
+    while (arr.length > stubs.length) arr.pop()!.destroy();
+    while (arr.length < stubs.length) {
+      const s = new Sprite(textures.wall_end);
+      s.anchor.set(0.5);
+      this.entityLayer.addChild(s);
+      arr.push(s);
+    }
+    for (let i = 0; i < stubs.length; i++) {
+      const s = arr[i];
+      s.position.set(cx, cy);
+      s.width = stubs[i].scale;
+      s.height = stubs[i].scale;
+      s.rotation = stubs[i].rot;
+      s.zIndex = z;
+    }
   }
 
   private reconcileBuildings(curr: Snapshot, st: ReturnType<typeof useStore.getState>): void {
     void st;
     const seen = new Set<number>();
+    // Index wall/gate tiles by `owner:x:y` for O(1) neighbour lookups when
+    // auto-tiling each wall/gate below.
+    const wallSet = new Set<string>();
+    for (const o of curr.buildings)
+      if (o.type === "wall" || o.type === "gate") wallSet.add(`${o.owner}:${o.tx}:${o.ty}`);
     for (const b of curr.buildings) {
       seen.add(b.id);
       let sp = this.buildingSprites.get(b.id);
@@ -618,16 +675,20 @@ export class PixiGame {
       sp.position.set(cx, cy);
       sp.zIndex = b.ty + def.size.h; // sort by bottom edge
 
-      // Walls & gates auto-tile: pick an orientation-correct variant sprite from
-      // the same-owner wall/gate neighbours, re-skinning only when they change.
+      // Walls & gates auto-tile from their same-owner neighbours. A simple run
+      // picks one variant sprite; a mixed diagonal⇄orthogonal junction also gets
+      // sibling "arm" sprites so every direction connects. Re-skin only on change.
       if (b.type === "wall" || b.type === "gate") {
-        const v = this.wallVariant(b, curr);
-        const skin = `${v.key}|${v.rot}|${v.scale}`;
+        const v = this.wallVariant(b, wallSet);
+        const skin = `${v.key}|${v.rot.toFixed(3)}|${v.scale.toFixed(3)}|${(v.stubs ?? [])
+          .map((s) => `${s.rot.toFixed(2)}:${s.scale.toFixed(2)}`)
+          .join(",")}`;
         if (this.wallSkin.get(b.id) !== skin) {
           sp.texture = textures[v.key];
           sp.width = v.scale;
           sp.height = v.scale;
           sp.rotation = v.rot;
+          this.syncWallStubs(b.id, cx, cy, sp.zIndex, v.stubs ?? []);
           this.wallSkin.set(b.id, skin);
         }
       }
@@ -643,6 +704,13 @@ export class PixiGame {
       sp.tint = bFlashing ? 0xff7a7a : 0xffffff; // base keeps true colours
       const bAccent = sp.children[0] as Sprite | undefined;
       if (bAccent) bAccent.tint = bFlashing ? 0xff7a7a : this.colorOf(b.owner);
+      // keep a junction's arm sprites in step with the base (fade-in, flash)
+      const bStubs = this.wallStubs.get(b.id);
+      if (bStubs)
+        for (const s of bStubs) {
+          s.alpha = sp.alpha;
+          s.tint = bFlashing ? 0xff7a7a : 0xffffff;
+        }
 
       // towers loose arrows at the nearest enemy in range
       if (b.type === "tower" && b.progress >= 1) {
@@ -665,6 +733,11 @@ export class PixiGame {
         this.buildProgress.delete(id);
         this.buildingFx.delete(id);
         this.wallSkin.delete(id);
+        const stubs = this.wallStubs.get(id);
+        if (stubs) {
+          for (const s of stubs) s.destroy();
+          this.wallStubs.delete(id);
+        }
       }
     }
   }
