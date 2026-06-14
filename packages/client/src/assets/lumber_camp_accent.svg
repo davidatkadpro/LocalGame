@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Team-colour accent: tinted with the player's colour. -->
+  <defs>
+    <linearGradient id="acc" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cccccc"/>
+    </linearGradient>
+  </defs>
+  <!-- pennant on the ridge pole (pole is in the base) -->
+  <polygon points="51.4,18 64,21.5 51.4,25" fill="url(#acc)"/>
+</svg>

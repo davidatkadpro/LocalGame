@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral base: a mining camp — a timbered mine mouth with an ore pile and
+       a pick. Pennant is a separate accent layer. -->
+  <defs>
+    <linearGradient id="mWall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9aa0a6"/>
+      <stop offset="1" stop-color="#6b7177"/>
+    </linearGradient>
+    <radialGradient id="mShaft" cx="0.5" cy="0.4" r="0.7">
+      <stop offset="0" stop-color="#2b2f33"/>
+      <stop offset="1" stop-color="#0c0d0f"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="93" rx="36" ry="5" fill="#000000" opacity="0.18"/>
+  <!-- rocky mound -->
+  <path d="M16 92 Q22 56 42 54 Q58 52 70 60 Q86 70 84 92 Z" fill="url(#mWall)"/>
+  <path d="M16 92 Q22 56 42 54 Q58 52 70 60 Q86 70 84 92 Z" fill="#000000" opacity="0.08"/>
+  <!-- shored mine entrance -->
+  <rect x="40" y="66" width="22" height="26" rx="1.5" fill="url(#mShaft)"/>
+  <rect x="38" y="63" width="26" height="5" rx="1.5" fill="#6e562f"/>
+  <rect x="38" y="66" width="4" height="26" fill="#6e562f"/>
+  <rect x="60" y="66" width="4" height="26" fill="#6e562f"/>
+  <!-- ridge pole for the pennant -->
+  <rect x="49" y="18" width="2.4" height="13" fill="#7b7363"/>
+  <line x1="50" y1="31" x2="50" y2="54" stroke="#7b7363" stroke-width="2"/>
+  <!-- ore nuggets at the mouth -->
+  <circle cx="28" cy="84" r="5" fill="#f1c40f"/>
+  <circle cx="34" cy="88" r="3.4" fill="#d4ac0d"/>
+  <circle cx="23" cy="88" r="3" fill="#f4d03f"/>
+  <!-- a pick -->
+  <line x1="70" y1="60" x2="64" y2="84" stroke="#8a6a3c" stroke-width="2.2"/>
+  <path d="M62 60 q10 -4 16 2 M62 60 q-2 6 2 11" stroke="#b9bfc4" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+</svg>

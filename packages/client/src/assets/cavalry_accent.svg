@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Team-colour accent: pennant on the lance + the rider's saddle cloth. -->
+  <defs>
+    <linearGradient id="acc" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#c8c8c8"/>
+    </linearGradient>
+  </defs>
+  <!-- pennant flying from the lance tip -->
+  <polygon points="33,9 49,13 35,19 38,14" fill="url(#acc)"/>
+  <!-- saddle cloth / caparison under the rider -->
+  <path d="M40 56 L58 56 L54 70 L44 70 Z" fill="url(#acc)"/>
+</svg>

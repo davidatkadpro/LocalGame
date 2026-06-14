@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral base: a mounted rider (horse + steel). Saddle cloth + pennant are
+       a separate team-colour accent layer. -->
+  <defs>
+    <linearGradient id="cHorse" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6e5a3e"/>
+      <stop offset="1" stop-color="#473324"/>
+    </linearGradient>
+    <radialGradient id="cHelm" cx="0.4" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#dfe4ea"/>
+      <stop offset="1" stop-color="#9aa3ac"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="92" rx="34" ry="5" fill="#000000" opacity="0.2"/>
+  <!-- lance -->
+  <rect x="20" y="12" width="4.5" height="64" rx="2" fill="#8a5a2b" transform="rotate(18 22 44)"/>
+  <polygon points="33,8 39,21 27,19" fill="#cdd4db"/>
+  <!-- horse body -->
+  <path d="M22 84 L26 58 Q34 50 50 52 L74 52 Q84 54 82 66 L80 84 L72 84 L70 68 Q60 72 46 70 L40 84 Z"
+        fill="url(#cHorse)"/>
+  <!-- horse legs shading -->
+  <rect x="24" y="78" width="6" height="8" fill="#000000" opacity="0.12"/>
+  <rect x="72" y="78" width="6" height="8" fill="#000000" opacity="0.12"/>
+  <!-- neck + head -->
+  <path d="M74 52 Q86 44 84 30 Q83 22 76 24 L70 40 Q70 48 74 52 Z" fill="url(#cHorse)"/>
+  <polygon points="78,24 84,18 84,28" fill="#3a2a1c"/>
+  <!-- mane -->
+  <path d="M73 40 Q80 34 79 26" stroke="#2f2316" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- rider torso + helmet -->
+  <path d="M40 54 C40 40 56 40 56 54 Z" fill="url(#cHelm)"/>
+  <circle cx="48" cy="34" r="11" fill="url(#cHelm)"/>
+  <path d="M37 34 a11 11 0 0 1 22 0 Z" fill="#000000" opacity="0.16"/>
+</svg>

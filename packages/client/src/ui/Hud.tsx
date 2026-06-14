@@ -37,20 +37,26 @@ const UNIT_LABEL: Record<UnitType, string> = {
   worker: "Worker",
   soldier: "Soldier",
   archer: "Archer",
+  cavalry: "Cavalry",
   ram: "Ram",
 };
 const UNIT_ICON: Record<UnitType, string> = {
   worker: "👷",
   soldier: "🛡",
   archer: "🏹",
+  cavalry: "🐎",
   ram: "🐏",
 };
 export const BUILDING_LABEL: Record<BuildingType, string> = {
   town_center: "Town Center",
   house: "House",
   barracks: "Barracks",
+  stable: "Stable",
   tower: "Guard Tower",
   storehouse: "Storehouse",
+  lumber_camp: "Lumber Camp",
+  mining_camp: "Mining Camp",
+  mill: "Mill",
   farm: "Farm",
   wall: "Wall",
   gate: "Gate",
@@ -58,6 +64,14 @@ export const BUILDING_LABEL: Record<BuildingType, string> = {
 };
 
 const BUILDABLE = Object.values(BUILDING_DEFS).filter((d) => d.buildable);
+
+// Short hints shown on the build button when the item is unlocked.
+const BUILDING_HINT: Partial<Record<BuildingType, string>> = {
+  storehouse: "Drop-off — shortens hauls from far patches",
+  lumber_camp: "Drop-off near wood — workers chop +20% faster here",
+  mining_camp: "Drop-off near gold — workers mine +20% faster here",
+  mill: "Drop-off near food — farmers/foragers gather +20% faster here",
+};
 
 type MobileTab = "build" | "commands" | "selection" | "controls";
 
@@ -260,7 +274,7 @@ function BuildPanelView({ onPlace }: { onPlace: (b: BuildingType) => void }) {
             key={d.type}
             onClick={() => onPlace(d.type)}
             disabled={locked}
-            title={locked ? `Unlocks in the ${AGE_DEFS[need].name}` : undefined}
+            title={locked ? `Unlocks in the ${AGE_DEFS[need].name}` : BUILDING_HINT[d.type]}
           >
             {BUILDING_LABEL[d.type]}{" "}
             {locked ? (

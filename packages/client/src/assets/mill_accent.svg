@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Team-colour accent: the windmill sails, tinted with the player's colour. -->
+  <defs>
+    <linearGradient id="acc" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cccccc"/>
+    </linearGradient>
+  </defs>
+  <!-- four sails on the hub at (50,46) -->
+  <g fill="url(#acc)" stroke="#8a8a8a" stroke-width="0.6">
+    <polygon points="50,46 64,40 60,46"/>
+    <polygon points="50,46 56,60 50,56"/>
+    <polygon points="50,46 36,52 40,46"/>
+    <polygon points="50,46 44,32 50,36"/>
+  </g>
+</svg>

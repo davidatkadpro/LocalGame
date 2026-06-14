@@ -469,11 +469,13 @@ legend: 🆕 brand new · 🔨 expand something we already have · ✅ shipped.
 
 **Where we are today (baseline).** Worth knowing before expanding:
 
-- **Units:** `worker`, `soldier`, `archer`, `ram` (siege). Counters with
-  building bonuses live in [COUNTERS](packages/shared/src/constants.ts#L297)
-  (ram ×5 vs buildings, archer bonus vs infantry, etc.).
-- **Buildings:** `town_center`, `house`, `barracks`, `tower`, `storehouse`
-  (drop-off), `farm`, `wall`, `siege_workshop`.
+- **Units:** `worker`, `soldier`, `archer`, `cavalry` (raider), `ram` (siege).
+  Counters with building bonuses live in
+  [COUNTERS](packages/shared/src/constants.ts#L297) (ram ×5 vs buildings, the
+  soldier→cavalry→archer→soldier triangle, etc.).
+- **Buildings:** `town_center`, `house`, `barracks`, `stable`, `tower`,
+  `storehouse` (drop-off), `lumber_camp` / `mining_camp` / `mill` (specialised
+  drop-offs), `farm`, `wall`, `gate`, `siege_workshop`.
 - **Resources:** `wood`, `food`, `gold` (3). Food from bushes, farms, and hunted
   animals (sheep/cow → meat carcass).
 - **Tech:** a working research system with three flat upgrades —
@@ -506,7 +508,7 @@ in `applyCommand`; the HUD shows an age badge, an Advance-Age button + progress,
 and 🔒 hints on locked items. Covered by `scripts/ages.test.ts`; ratios re-pinned
 in `scripts/balance.test.ts`. Remaining §7 items now slot in as per-age unlocks.
 
-### 7.2 Specialised drop-off camps (Lumber / Mining / Mill)  — 🔨 **M**
+### 7.2 Specialised drop-off camps (Lumber / Mining / Mill)  — 🔨 **M** — ✅ done
 
 **Have today.** One generic `storehouse` drop-off; gather loop already routes to
 the nearest drop-off ([nearestDropOff](packages/shared/src/sim.ts#L156)).
@@ -516,6 +518,17 @@ Mill). Reuses the drop-off routing; mostly new building defs + a per-kind bonus
 in the gather tick.
 **Files.** [constants.ts](packages/shared/src/constants.ts),
 [sim.ts](packages/shared/src/sim.ts), assets, [Hud.tsx](packages/client/src/ui/Hud.tsx).
+**Status.** Shipped three specialised drop-offs — **Lumber Camp** (wood),
+**Mining Camp** (gold), **Mill** (food) — each `isDropOff` (2×2, 75 wood, 10s),
+buildable from the Dark Age like the storehouse. Each grants **+20%**
+(`CAMP_GATHER_BONUS`) to *its* resource when it's the worker's **nearest
+drop-off**, so dropping the right camp next to the right patch both shortens the
+haul and speeds the gather (`campBonusFor` applied in `doGather`). The generic
+storehouse stays as the cheap no-bonus option. New SVGs + accents; build-menu
+hints describe each bonus. Covered by `scripts/m3.test.ts` §18 (camp out-gathers
+storehouse by exactly 1.20×); ratios untouched in `scripts/balance.test.ts`.
+When **7.4 Stone** lands, the Mining Camp extends to stone. Per-camp research
+techs (AoE's gather upgrades) fold naturally into **7.3**'s tiered tree later.
 
 ### 7.3 Blacksmith + tiered tech tree  — 🔨 **M**
 
@@ -575,7 +588,7 @@ siege workshop and the COUNTERS table; new bit is area-of-effect damage.
 [sim.ts](packages/shared/src/sim.ts) (AoE damage), assets,
 [Hud.tsx](packages/client/src/ui/Hud.tsx).
 
-### 7.8 Cavalry (Stable)  — 🆕 **M**
+### 7.8 Cavalry (Stable)  — 🆕 **M** — ✅ done
 
 A fast raider (scout/knight) from a new **Stable** — built to run down workers
 and harass eco, weak to spear/infantry. Extends the counter triangle and gives
@@ -583,6 +596,17 @@ map presence. Mostly a unit def + building + counter entries + sprite.
 **Files.** [types.ts](packages/shared/src/types.ts) (`UnitType`),
 [constants.ts](packages/shared/src/constants.ts),
 [sim.ts](packages/shared/src/sim.ts), assets, [Hud.tsx](packages/client/src/ui/Hud.tsx).
+**Status.** Shipped **Cavalry** trained at a new **Stable** (3×3, 175 wood,
+Feudal). Cavalry is the **fastest unit** (speed 3.0 — outruns workers/archers),
+gold-gated (70 food / 30 gold), 100 hp melee. It **closes the counter triangle**:
+cavalry ×1.5 vs archers & workers (rides down ranged + raids eco) but ×0.5 vs
+buildings (no siege role), while **soldiers** now get ×1.5 vs cavalry — so
+`soldier > cavalry > archer > soldier`. All sim behaviour is generic over
+`UNIT_DEFS`/`MILITARY`/`DAMAGE_COUNTERS`, so no bespoke combat code; build menu +
+train button are auto-driven by `buildable`/`canTrain`. New SVGs (mounted rider +
+timber stable) with team-colour accents. Covered by `scripts/m3.test.ts` §19/§19b
+(trains from the stable, age-gated, rides archers down harder than soldiers,
+soldiers out-trade it) and 7 new guardrails in `scripts/balance.test.ts`.
 
 ### 7.9 Unit stances + patrol  — 🔨 **M**
 

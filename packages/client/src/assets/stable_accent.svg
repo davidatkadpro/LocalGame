@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Team-colour accent: tinted with the player's colour. -->
+  <defs>
+    <linearGradient id="acc" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cccccc"/>
+    </linearGradient>
+  </defs>
+  <!-- banner flying from the pole (pole is in the base) -->
+  <polygon points="65,10 86,16 65,22 70,16" fill="url(#acc)"/>
+  <!-- horseshoe emblem over the doorway -->
+  <path d="M44 66 A8 8 0 1 1 56 66 L53 66 A5 5 0 1 0 47 66 Z" fill="url(#acc)"/>
+</svg>

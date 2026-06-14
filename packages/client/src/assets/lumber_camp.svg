@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral base: a forester's camp — a sawhorse over stacked logs.
+       Pennant is a separate accent layer. -->
+  <defs>
+    <linearGradient id="lWall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b79a6a"/>
+      <stop offset="1" stop-color="#8a6c3c"/>
+    </linearGradient>
+    <linearGradient id="lRoof" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6f8a4d"/>
+      <stop offset="1" stop-color="#46602e"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="50" cy="93" rx="36" ry="5" fill="#000000" opacity="0.18"/>
+  <!-- lean-to shelter -->
+  <rect x="22" y="50" width="56" height="42" rx="2" fill="url(#lWall)"/>
+  <rect x="22" y="50" width="56" height="42" rx="2" fill="#000000" opacity="0.10"/>
+  <rect x="24" y="54" width="6" height="38" fill="#6e562f"/>
+  <rect x="70" y="54" width="6" height="38" fill="#6e562f"/>
+  <!-- pitched green-bough roof -->
+  <polygon points="14,54 50,30 86,54" fill="url(#lRoof)"/>
+  <polygon points="50,30 86,54 50,54" fill="#000000" opacity="0.12"/>
+  <rect x="14" y="52" width="72" height="6" rx="2" fill="#3c4f24"/>
+  <!-- ridge pole for the pennant -->
+  <rect x="49" y="18" width="2.4" height="13" fill="#7b7363"/>
+  <!-- stacked logs (end-on) -->
+  <g stroke="#5f4422" stroke-width="1.4">
+    <circle cx="36" cy="80" r="6" fill="#c79a5b"/>
+    <circle cx="49" cy="80" r="6" fill="#bb8e50"/>
+    <circle cx="62" cy="80" r="6" fill="#c79a5b"/>
+    <circle cx="42.5" cy="70" r="6" fill="#bb8e50"/>
+    <circle cx="55.5" cy="70" r="6" fill="#c79a5b"/>
+  </g>
+  <g stroke="#7a5a30" stroke-width="1" fill="none">
+    <circle cx="36" cy="80" r="2.4"/><circle cx="49" cy="80" r="2.4"/>
+    <circle cx="62" cy="80" r="2.4"/><circle cx="42.5" cy="70" r="2.4"/>
+    <circle cx="55.5" cy="70" r="2.4"/>
+  </g>
+  <!-- an axe leaning on the stack -->
+  <line x1="68" y1="58" x2="60" y2="84" stroke="#8a6a3c" stroke-width="2.2"/>
+  <path d="M64 58 q8 -2 9 5 q-7 3 -11 -1 Z" fill="#cdd2d6" stroke="#8a9096" stroke-width="0.8"/>
+</svg>

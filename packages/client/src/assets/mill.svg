@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral base: a mill — a round granary tower with sails and grain sacks.
+       The sails are a separate accent layer (team-tinted). -->
+  <defs>
+    <linearGradient id="miWall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d8c79a"/>
+      <stop offset="1" stop-color="#a98f5e"/>
+    </linearGradient>
+    <linearGradient id="miRoof" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8d5b3a"/>
+      <stop offset="1" stop-color="#5d3a23"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="50" cy="93" rx="36" ry="5" fill="#000000" opacity="0.18"/>
+  <!-- mill tower -->
+  <path d="M34 92 L38 50 L62 50 L66 92 Z" fill="url(#miWall)"/>
+  <path d="M50 50 L62 50 L66 92 L50 92 Z" fill="#000000" opacity="0.10"/>
+  <!-- conical cap -->
+  <polygon points="32,52 50,32 68,52" fill="url(#miRoof)"/>
+  <polygon points="50,32 68,52 50,52" fill="#000000" opacity="0.12"/>
+  <!-- hub the sails turn on -->
+  <circle cx="50" cy="46" r="3.4" fill="#5d3a23"/>
+  <!-- door + grain window -->
+  <rect x="45" y="76" width="10" height="16" rx="1.4" fill="#6e4d27"/>
+  <circle cx="50" cy="64" r="3.6" fill="#caa85e" stroke="#7a5a30" stroke-width="1"/>
+  <!-- grain sacks -->
+  <path d="M22 90 Q20 74 30 74 Q40 74 38 90 Z" fill="#cbb892"/>
+  <path d="M25 74 Q30 70 35 74" stroke="#8a795a" stroke-width="1.4" fill="none"/>
+  <path d="M64 90 Q63 78 71 78 Q79 78 78 90 Z" fill="#bfa97f"/>
+</svg>

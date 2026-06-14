@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Neutral base: a stable — a timber-framed barn with a wide arched stall.
+       Banner + horse-head emblem are a separate accent layer. -->
+  <defs>
+    <linearGradient id="stWall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#caa877"/>
+      <stop offset="1" stop-color="#9c7c4f"/>
+    </linearGradient>
+    <linearGradient id="stRoof" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8d5b3a"/>
+      <stop offset="1" stop-color="#5d3a23"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="50" cy="94" rx="42" ry="5" fill="#000000" opacity="0.16"/>
+  <!-- banner pole -->
+  <rect x="61" y="8" width="4" height="30" fill="#7b7363"/>
+  <!-- gable roof -->
+  <polygon points="14,46 50,22 86,46" fill="url(#stRoof)"/>
+  <polygon points="50,22 86,46 50,46" fill="#000000" opacity="0.12"/>
+  <!-- barn body -->
+  <rect x="18" y="46" width="64" height="46" rx="2" fill="url(#stWall)"/>
+  <!-- timber framing -->
+  <g stroke="#5d3a23" stroke-width="2.4" opacity="0.5">
+    <line x1="18" y1="62" x2="82" y2="62"/>
+    <line x1="32" y1="46" x2="32" y2="92"/>
+    <line x1="68" y1="46" x2="68" y2="92"/>
+  </g>
+  <!-- wide stall doorway (stable door, top half open) -->
+  <path d="M38 92 L38 60 Q50 52 62 60 L62 92 Z" fill="#2c2114" opacity="0.55"/>
+  <rect x="38" y="74" width="24" height="3" fill="#2c2114" opacity="0.4"/>
+  <rect x="18" y="86" width="64" height="6" fill="#000000" opacity="0.1"/>
+</svg>
