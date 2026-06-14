@@ -1963,3 +1963,7 @@ export class PixiGame {
 const keys = new Set<string>();
 window.addEventListener("keydown", (e) => keys.add(e.key.toLowerCase()));
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+// A held key's keyup never fires if the window loses focus (alt-tab, devtools,
+// clicking away), which would otherwise leave an arrow "stuck" and pan the camera
+// forever. Drop all held keys whenever focus leaves.
+window.addEventListener("blur", () => keys.clear());
