@@ -9,6 +9,7 @@ import {
   TICK_MS,
   UNIT_DEFS,
   base64ToBytes,
+  isWall,
   minAgeOfBuilding,
   rectContains,
   type AnimalDTO,
@@ -441,8 +442,19 @@ export class PixiGame {
    * Attach the team-colour accent as a child sprite. It inherits the base's
    * transform (position, facing flip, fade), so we only ever set its tint.
    */
+  /** Per-tier wall colour (the art is neutral grey stone). 0xffffff for anything
+   *  that isn't a wall tier, so non-walls render in their true colours. */
+  private wallTint(type: string): number {
+    switch (type) {
+      case "wall": return 0xc89a5a; // palisade — warm timber
+      case "fortified_wall": return 0x8fa0b8; // reinforced — cool steel
+      default: return 0xffffff; // stone_wall (true grey) + every non-wall
+    }
+  }
+
   private attachAccent(base: Sprite, type: string): void {
-    const k = accentKey(type);
+    // Wall tiers share the palisade's team-cap accent (no per-tier accent art).
+    const k = accentKey(isWall(type as BuildingType) ? "wall" : type);
     if (!k) return;
     const a = new Sprite(textures[k]);
     a.anchor.set(0.5); // both textures are 100×100, so scale 1 matches the base
@@ -655,7 +667,8 @@ export class PixiGame {
     // auto-tiling each wall/gate below.
     const wallSet = new Set<string>();
     for (const o of curr.buildings)
-      if (o.type === "wall" || o.type === "gate") wallSet.add(`${o.owner}:${o.tx}:${o.ty}`);
+      if (isWall(o.type as BuildingType) || o.type === "gate")
+        wallSet.add(`${o.owner}:${o.tx}:${o.ty}`);
     for (const b of curr.buildings) {
       seen.add(b.id);
       let sp = this.buildingSprites.get(b.id);
@@ -678,7 +691,7 @@ export class PixiGame {
       // Walls & gates auto-tile from their same-owner neighbours. A simple run
       // picks one variant sprite; a mixed diagonal⇄orthogonal junction also gets
       // sibling "arm" sprites so every direction connects. Re-skin only on change.
-      if (b.type === "wall" || b.type === "gate") {
+      if (isWall(b.type as BuildingType) || b.type === "gate") {
         const v = this.wallVariant(b, wallSet);
         const skin = `${v.key}|${v.rot.toFixed(3)}|${v.scale.toFixed(3)}|${(v.stubs ?? [])
           .map((s) => `${s.rot.toFixed(2)}:${s.scale.toFixed(2)}`)
@@ -701,15 +714,18 @@ export class PixiGame {
       bfx.hp = b.hp;
       this.buildingFx.set(b.id, bfx);
       const bFlashing = this.now < bfx.flashUntil;
-      sp.tint = bFlashing ? 0xff7a7a : 0xffffff; // base keeps true colours
+      // Wall tiers reuse the (grey) palisade art, recoloured by tint: palisade →
+      // timber, stone wall → true grey, fortified → steel. Non-walls stay 0xffffff.
+      const tierTint = this.wallTint(b.type);
+      sp.tint = bFlashing ? 0xff7a7a : tierTint;
       const bAccent = sp.children[0] as Sprite | undefined;
       if (bAccent) bAccent.tint = bFlashing ? 0xff7a7a : this.colorOf(b.owner);
-      // keep a junction's arm sprites in step with the base (fade-in, flash)
+      // keep a junction's arm sprites in step with the base (fade-in, flash, tier)
       const bStubs = this.wallStubs.get(b.id);
       if (bStubs)
         for (const s of bStubs) {
           s.alpha = sp.alpha;
-          s.tint = bFlashing ? 0xff7a7a : 0xffffff;
+          s.tint = bFlashing ? 0xff7a7a : tierTint;
         }
 
       // Defensive buildings (towers and now the TC) loose arrows at the nearest
@@ -1078,12 +1094,12 @@ export class PixiGame {
       return;
     }
     if (!this.placing) return;
-    if (this.placing === "wall") {
+    if (isWall(this.placing)) {
       // Preview the whole dragged run (or just the hovered tile before a drag).
       const end = this.floorTile(this.hoverWorld);
       const tiles = this.wallDragStart ? this.wallLineTiles(this.wallDragStart, end) : [end];
       for (const t of tiles) {
-        const col = this.clientPlacementValid("wall", t.x, t.y) ? 0x51cf66 : 0xe03131;
+        const col = this.clientPlacementValid(this.placing, t.x, t.y) ? 0x51cf66 : 0xe03131;
         g.rect(t.x, t.y, 1, 1)
           .fill({ color: col, alpha: 0.25 })
           .stroke({ width: sw, color: col, alpha: 0.9 });
@@ -1294,7 +1310,7 @@ export class PixiGame {
       } else if (e.button === 0) {
         if (this.armedAttack) {
           this.issueAttackMove(this.screenToWorld(x, y));
-        } else if (this.placing === "wall") {
+        } else if (this.placing && isWall(this.placing)) {
           this.wallDragStart = this.floorTile(this.screenToWorld(x, y)); // drag = line
         } else if (this.placing) {
           this.tryPlace(this.screenToWorld(x, y));
@@ -1311,7 +1327,7 @@ export class PixiGame {
         this.wallDragStart = null; // a second finger cancels a wall drag
         this.clearLongPress();
       } else if (this.pointers.size === 1) {
-        if (this.placing === "wall") {
+        if (this.placing && isWall(this.placing)) {
           // Drag a finger to lay a line of walls (release to place).
           this.wallDragStart = this.floorTile(this.screenToWorld(x, y));
         } else if (this.selectMode) {
@@ -1834,6 +1850,8 @@ export class PixiGame {
   /** Place every valid wall tile along the dragged line (one build per segment;
    *  the server pays/validates each, and a worker auto-chains down the run). */
   private placeWallLine(a: { x: number; y: number }, b: { x: number; y: number }): void {
+    // Which wall tier we're laying (palisade / stone / fortified).
+    const tier: BuildingType = this.placing && isWall(this.placing) ? this.placing : "wall";
     const worker = [...this.selected].find((id) => {
       const u = useStore.getState().curr?.units.find((x) => x.id === id);
       return u && u.type === "worker";
@@ -1844,8 +1862,8 @@ export class PixiGame {
     }
     let placed = false;
     for (const t of this.wallLineTiles(a, b)) {
-      if (!this.clientPlacementValid("wall", t.x, t.y)) continue;
-      this.send({ c: "build", unit: worker, building: "wall", tile: t });
+      if (!this.clientPlacementValid(tier, t.x, t.y)) continue;
+      this.send({ c: "build", unit: worker, building: tier, tile: t });
       placed = true;
     }
     if (placed) sfx.build();

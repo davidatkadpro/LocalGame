@@ -288,17 +288,47 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     farm: { capacity: 250, regenPerSec: 6 },
     buildable: true,
   },
+  // Wall tiers (§7.6): palisade → stone → fortified. Each is a 1×1 wall-like
+  // building that drag-places into a line and auto-connects; higher tiers cost
+  // stone, take longer, and have far more hp (siege-resistance scales with age +
+  // a stone economy). See WALL_TYPES / isWall.
   wall: {
     type: "wall",
     hp: 200,
     sight: 1,
     size: { w: 1, h: 1 },
-    cost: { wood: 10 },
+    cost: { wood: 10 }, // palisade — cheap wooden speed-bump, available immediately
     buildMs: 3000,
     providesPop: 0,
     isDropOff: false,
     canTrain: [],
     buildable: true,
+  },
+  stone_wall: {
+    type: "stone_wall",
+    hp: 600,
+    sight: 1,
+    size: { w: 1, h: 1 },
+    cost: { wood: 5, stone: 15 }, // real defence once you've a stone economy
+    buildMs: 6000,
+    providesPop: 0,
+    isDropOff: false,
+    canTrain: [],
+    buildable: true,
+    minAge: 1, // Feudal
+  },
+  fortified_wall: {
+    type: "fortified_wall",
+    hp: 1500,
+    sight: 1,
+    size: { w: 1, h: 1 },
+    cost: { wood: 5, stone: 35 }, // a late-game fortress wall; shrugs off rams
+    buildMs: 10000,
+    providesPop: 0,
+    isDropOff: false,
+    canTrain: [],
+    buildable: true,
+    minAge: 2, // Imperial
   },
   gate: {
     type: "gate",
@@ -330,6 +360,16 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     minAge: 2, // Imperial
   },
 };
+
+/** The wall tiers, weakest→strongest. All behave identically (1×1, blocks
+ *  pathing, drag-places into an auto-connecting line); they differ only in
+ *  cost / build time / hp / age. Gates are wall-line doors, handled separately. */
+export const WALL_TYPES: BuildingType[] = ["wall", "stone_wall", "fortified_wall"];
+
+/** True if `type` is one of the wall tiers (not a gate). */
+export function isWall(type: BuildingType): boolean {
+  return WALL_TYPES.includes(type);
+}
 
 export interface UpgradeDef {
   id: UpgradeId;

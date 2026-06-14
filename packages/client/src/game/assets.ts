@@ -67,6 +67,8 @@ export type SpriteKey =
   | "mill"
   | "farm"
   | "wall"
+  | "stone_wall"
+  | "fortified_wall"
   | "wall_straight"
   | "wall_end"
   | "wall_corner"
@@ -116,7 +118,11 @@ const URLS: Record<SpriteKey, string> = {
   mining_camp: miningCampUrl,
   mill: millUrl,
   farm: farmUrl,
+  // Wall tiers reuse the palisade geometry; the auto-tiler swaps in the right
+  // variant and the renderer tints by tier, so no extra art is needed.
   wall: wallUrl,
+  stone_wall: wallUrl,
+  fortified_wall: wallUrl,
   wall_straight: wallStraightUrl,
   wall_end: wallEndUrl,
   wall_corner: wallCornerUrl,

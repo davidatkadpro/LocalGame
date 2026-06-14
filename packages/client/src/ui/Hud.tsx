@@ -58,7 +58,9 @@ export const BUILDING_LABEL: Record<BuildingType, string> = {
   mining_camp: "Mining Camp",
   mill: "Mill",
   farm: "Farm",
-  wall: "Wall",
+  wall: "Palisade",
+  stone_wall: "Stone Wall",
+  fortified_wall: "Fortified Wall",
   gate: "Gate",
   siege_workshop: "Siege Workshop",
 };
@@ -71,6 +73,9 @@ const BUILDING_HINT: Partial<Record<BuildingType, string>> = {
   lumber_camp: "Drop-off near wood — workers chop +20% faster here",
   mining_camp: "Drop-off near gold — workers mine +20% faster here",
   mill: "Drop-off near food — farmers/foragers gather +20% faster here",
+  wall: "Cheap wooden palisade — drag to lay a line",
+  stone_wall: "Sturdy stone wall (needs stone) — drag to lay a line",
+  fortified_wall: "Toughest wall, shrugs off rams (lots of stone) — drag a line",
 };
 
 type MobileTab = "build" | "commands" | "selection" | "controls";

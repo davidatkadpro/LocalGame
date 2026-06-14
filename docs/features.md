@@ -475,7 +475,8 @@ legend: 🆕 brand new · 🔨 expand something we already have · ✅ shipped.
   soldier→cavalry→archer→soldier triangle, etc.).
 - **Buildings:** `town_center`, `house`, `barracks`, `stable`, `tower`,
   `storehouse` (drop-off), `lumber_camp` / `mining_camp` / `mill` (specialised
-  drop-offs), `farm`, `wall`, `gate`, `siege_workshop`.
+  drop-offs), `farm`, `wall` / `stone_wall` / `fortified_wall` (tiers), `gate`,
+  `siege_workshop`.
 - **Resources:** `wood`, `food`, `gold`, `stone` (4). Food from bushes, farms,
   and hunted animals (sheep/cow → meat carcass); stone is the defensive resource
   (towers/fortifications), contested toward the map centre.
@@ -585,7 +586,7 @@ Sim-tested in [tc_arrows.test.ts](scripts/tc_arrows.test.ts). 7.5b **garrison**
 (shelter units, garrisoned archers add arrows, villagers eject on command) is
 deferred.
 
-### 7.6 Walls → Gates, auto-connect, and tiers  — 🔨 **M** — ✅ gates + auto-connect (tiers pending 7.4)
+### 7.6 Walls → Gates, auto-connect, and tiers  — 🔨 **M** — ✅ done
 
 **Have today.** 1×1 `wall` with drag-to-place a line (§3.2 ✅). **Gates** ✅ — a
 1×1 wall-line door, solid to enemies and neutral wildlife but passable to the
@@ -594,12 +595,24 @@ steering, and collision). **Auto-connecting sprites** ✅ — each wall/gate pic
 an orientation-correct variant (post / end / straight / corner / T / cross, plus
 true 45° **diagonal** segments) from its same-owner neighbours, re-skinning as
 the line grows. Gates orient to the wall they sit in.
-**Still to add.** palisade→stone→fortified wall **tiers** — deferred to pair with
-7.4 Stone (wood-only tiers would just be hp/cost scaling).
+**Tiers** ✅ — palisade → stone wall → fortified wall, now that §7.4 stone gives
+them distinct economies. Three `BuildingType`s (`wall` / `stone_wall` /
+`fortified_wall`), unified by a shared `isWall` / `WALL_TYPES` helper so all the
+wall machinery (drag-line, auto-connect, one-worker chain, gate passability)
+treats every tier identically. They differ in **cost / build time / hp / age**:
+palisade `10 wood` (Dark, 200 hp), stone `5 wood + 15 stone` (Feudal, 600 hp),
+fortified `5 wood + 35 stone` (Imperial, 1500 hp — shrugs off rams). No new art:
+all tiers **reuse the (grey) palisade auto-tile variants and recolour by tint**
+(timber / true grey / steel), with the team cap accent shared. `chainToNextWall`
+now chains within a single tier so a dragged line builds coherently.
 **Files.** [PixiGame.ts](packages/client/src/game/PixiGame.ts) (`wallVariant`
-auto-tile + reconcile branch), [sim.ts](packages/shared/src/sim.ts) (`gateOpenFor`
-+ owner-aware blocker/stepOpen/collision), [constants.ts](packages/shared/src/constants.ts)
-(gate def), wall/gate SVGs, [scripts/gates.test.ts](scripts/gates.test.ts).
+auto-tile + `wallTint` + placement generalised over wall tiers),
+[sim.ts](packages/shared/src/sim.ts) (`gateOpenFor` + owner-aware blocker; `isWall`
+in the build-chain), [constants.ts](packages/shared/src/constants.ts) (tier defs +
+`isWall`/`WALL_TYPES`), [types.ts](packages/shared/src/types.ts),
+[Hud.tsx](packages/client/src/ui/Hud.tsx) (labels/hints), wall/gate SVGs,
+[scripts/gates.test.ts](scripts/gates.test.ts) +
+[scripts/wall_tiers.test.ts](scripts/wall_tiers.test.ts).
 
 ### 7.7 Siege expansion: mangonel & trebuchet  — 🔨 **M**
 

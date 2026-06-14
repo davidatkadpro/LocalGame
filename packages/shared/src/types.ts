@@ -21,6 +21,8 @@ export type BuildingType =
   | "mill"
   | "farm"
   | "wall"
+  | "stone_wall"
+  | "fortified_wall"
   | "gate"
   | "siege_workshop";
 

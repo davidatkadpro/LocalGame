@@ -19,6 +19,7 @@ import {
   emptyResources,
   gatherRate,
   incomingDamage,
+  isWall,
   minAgeOfBuilding,
   minAgeOfUnit,
   minAgeOfUpgrade,
@@ -1355,7 +1356,7 @@ function doBuild(world: World, u: Unit): void {
   if (!b || !buildingNeedsWork(b)) {
     // Whole (finished and undamaged) or gone. Chaining along a wall line keeps a
     // single worker building the whole run; otherwise go back to gathering.
-    if (b && b.type === "wall" && chainToNextWall(world, u)) return;
+    if (b && isWall(b.type) && chainToNextWall(world, u, b.type)) return;
     resumeGatherOrIdle(world, u);
     return;
   }
@@ -1372,7 +1373,7 @@ function doBuild(world: World, u: Unit): void {
     if (b.progress >= 1) {
       b.hp = def.hp;
       onBuildingComplete(world, b);
-      if (b.type === "wall" && chainToNextWall(world, u)) return;
+      if (isWall(b.type) && chainToNextWall(world, u, b.type)) return;
       resumeGatherOrIdle(world, u);
     }
     return;
@@ -1395,11 +1396,13 @@ function doBuild(world: World, u: Unit): void {
  * After finishing a wall, send the builder to the nearest unfinished friendly
  * wall nearby so one worker constructs a whole dragged wall line on its own.
  */
-function chainToNextWall(world: World, u: Unit): boolean {
+function chainToNextWall(world: World, u: Unit, wallType: BuildingType): boolean {
   let best: Building | null = null;
   let bestD = 12; // only chain to walls within a dozen tiles
   for (const b of world.buildings) {
-    if (b.owner !== u.owner || b.type !== "wall" || b.progress >= 1) continue;
+    // Same tier only, so a dragged line of one wall kind builds as a unit and a
+    // worker doesn't hop onto a different-tier wall it wasn't dragging.
+    if (b.owner !== u.owner || b.type !== wallType || b.progress >= 1) continue;
     const d = distToBuilding(u.pos, b);
     if (d < bestD) {
       bestD = d;
