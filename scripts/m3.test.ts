@@ -587,5 +587,37 @@ function findOpenBlock(world: ReturnType<typeof createWorld>, size: number): { x
   check("the worker stops repairing once whole", worker.state !== "building");
 }
 
+// ---- 17. cancelTrain refunds and can target a specific queue slot -----------
+{
+  const world = createWorld(7, [PS[0]]);
+  const tc = world.buildings.find((b) => b.owner === 0 && b.type === "town_center")!;
+  const p = world.players[0];
+  p.resources.wood = 9999;
+  p.resources.food = 9999;
+  p.resources.gold = 9999;
+  // Queue three workers.
+  for (let i = 0; i < 3; i++) applyCommand(world, 0, { c: "train", building: tc.id, unit: "worker" });
+  check("three units queued", tc.queue.length === 3);
+  const cost = UNIT_DEFS.worker.cost.food ?? 0;
+  const foodAfterQueue = p.resources.food;
+
+  // Cancel the middle slot (index 1): queue shrinks, food refunded, front timer
+  // unchanged (we didn't touch the unit in production).
+  const timerBefore = tc.produceTimer;
+  applyCommand(world, 0, { c: "cancelTrain", building: tc.id, index: 1 });
+  check("cancelling a middle slot removes exactly one", tc.queue.length === 2);
+  check("cancelling a slot refunds its food", p.resources.food === foodAfterQueue + cost);
+  check("cancelling a non-front slot leaves production running", tc.produceTimer === timerBefore);
+
+  // Cancel the front slot (index 0): production restarts on the new front unit.
+  applyCommand(world, 0, { c: "cancelTrain", building: tc.id, index: 0 });
+  check("cancelling the front slot restarts production", tc.produceTimer === UNIT_DEFS.worker.trainMs);
+
+  // Index-less cancel still pops the last queued unit and empties the queue.
+  applyCommand(world, 0, { c: "cancelTrain", building: tc.id });
+  check("index-less cancel pops the last unit", tc.queue.length === 0);
+  check("an empty queue clears the produce timer", tc.produceTimer === 0);
+}
+
 console.log(pass ? "M3: PASS ✅" : "M3: FAIL ❌");
 process.exit(pass ? 0 : 1);

@@ -647,7 +647,7 @@ Turns the eco game from guesswork into management.
 **Files.** [store.ts](packages/client/src/net/store.ts) (derived tally),
 [Hud.tsx](packages/client/src/ui/Hud.tsx).
 
-### 8.4 Sub-select & cancel from the panels  — 🔨 **S**
+### 8.4 Sub-select & cancel from the panels  — 🔨 **S** — ✅ done
 
 The selection panel already groups by type — make clicking a type group **narrow
 the selection to just that type** (AoE idiom), and make production-queue slots
@@ -655,6 +655,11 @@ the selection to just that type** (AoE idiom), and make production-queue slots
 **Files.** [Hud.tsx](packages/client/src/ui/Hud.tsx),
 [PixiGame.ts](packages/client/src/game/PixiGame.ts),
 [sim.ts](packages/shared/src/sim.ts) (queue cancel + refund).
+**Status.** Sub-select already shipped (panel rows narrow the selection), and
+`cancelTrain` already refunded. Added **per-slot cancel**: each queued unit chip
+is now a button that cancels *that* slot and refunds it (`index` on the command);
+cancelling the in-production front restarts the next unit. "Cancel last" kept as
+the index-less fallback. Covered by `scripts/m3.test.ts` §17.
 
 ### 8.5 Click an alert to jump there  — 🔨 **S** — ✅ done (Space)
 

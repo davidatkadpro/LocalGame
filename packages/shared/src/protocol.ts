@@ -139,7 +139,7 @@ export type Command =
   | { c: "build"; unit: number; building: BuildingType; tile: Vec2 }
   | { c: "construct"; units: number[]; building: number }
   | { c: "train"; building: number; unit: UnitType }
-  | { c: "cancelTrain"; building: number }
+  | { c: "cancelTrain"; building: number; index?: number }
   | { c: "research"; building: number; upgrade: UpgradeId }
   | { c: "rally"; building: number; tile: Vec2 }
   | { c: "attack"; units: number[]; target: number; queue?: boolean }

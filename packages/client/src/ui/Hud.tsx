@@ -585,13 +585,18 @@ function BuildingPanel({
             <>
               <div className="queue">
                 {queue.map((u, i) => (
-                  <span className="chip" key={i}>
+                  <button
+                    className="chip"
+                    key={i}
+                    title={`Cancel this ${UNIT_LABEL[u]} (refunded)`}
+                    onClick={() => command({ c: "cancelTrain", building: building.id, index: i })}
+                  >
                     {UNIT_LABEL[u][0]}
-                  </span>
+                  </button>
                 ))}
                 <span className="small muted">×{queue.length}</span>
                 <button className="cancel" onClick={() => command({ c: "cancelTrain", building: building.id })}>
-                  Cancel
+                  Cancel last
                 </button>
               </div>
               <div className="progress">

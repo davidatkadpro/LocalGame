@@ -384,13 +384,17 @@ export function applyCommand(world: World, playerId: PlayerId, cmd: Command): vo
     case "cancelTrain": {
       const b = buildingById(world, cmd.building);
       if (!b || b.owner !== playerId || b.queue.length === 0) break;
-      // Refund the last-queued unit and remove it.
-      const removed = b.queue.pop()!;
+      // Cancel a specific queue slot when given an index, else the last-queued
+      // unit; refund its full cost either way.
+      const idx = cmd.index ?? b.queue.length - 1;
+      if (idx < 0 || idx >= b.queue.length) break;
+      const [removed] = b.queue.splice(idx, 1);
       const rdef = UNIT_DEFS[removed];
       player.resources.wood += rdef.cost.wood ?? 0;
       player.resources.food += rdef.cost.food ?? 0;
       player.resources.gold += rdef.cost.gold ?? 0;
       if (b.queue.length === 0) b.produceTimer = 0;
+      else if (idx === 0) b.produceTimer = UNIT_DEFS[b.queue[0]].trainMs; // restart the new front
       break;
     }
     case "research": {
