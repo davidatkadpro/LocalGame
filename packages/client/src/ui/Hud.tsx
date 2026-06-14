@@ -104,7 +104,7 @@ export function Hud({
     setShowControls(show);
   };
 
-  const res = snap?.me.resources ?? { wood: 0, food: 0, gold: 0 };
+  const res = snap?.me.resources ?? { wood: 0, food: 0, gold: 0, stone: 0 };
   const pop = snap?.me.pop ?? 0;
   const popCap = snap?.me.popCap ?? 0;
   const upgrades = snap?.me.upgrades ?? [];
@@ -133,6 +133,7 @@ export function Hud({
         <Res icon="🪵" label="Wood" value={res.wood} rate={income.wood} />
         <Res icon="🍖" label="Food" value={res.food} rate={income.food} />
         <Res icon="🪙" label="Gold" value={res.gold} rate={income.gold} />
+        <Res icon="🪨" label="Stone" value={res.stone} rate={income.stone} />
         <Res
           icon="👷"
           label="Workers"
@@ -854,5 +855,6 @@ function CostBadge({ cost }: { cost: Partial<Resources> }) {
   if (cost.wood) parts.push(`${cost.wood}🪵`);
   if (cost.food) parts.push(`${cost.food}🍖`);
   if (cost.gold) parts.push(`${cost.gold}🪙`);
+  if (cost.stone) parts.push(`${cost.stone}🪨`);
   return <span className="muted small">({parts.join(" ") || "free"})</span>;
 }

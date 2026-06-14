@@ -81,13 +81,14 @@ function ensureClientId(): string {
 // Smooth the positive per-resource deltas between snapshots into a per-second
 // rate. Spending (training/building) shows as a drop, which we floor at zero so
 // the readout reflects gathering income, not net balance.
-const incomeEma: Resources = { wood: 0, food: 0, gold: 0 };
+const incomeEma: Resources = { wood: 0, food: 0, gold: 0, stone: 0 };
 let incLastRes: Resources | null = null;
 let incLastAt = 0;
 function resetIncome(): void {
   incomeEma.wood = 0;
   incomeEma.food = 0;
   incomeEma.gold = 0;
+  incomeEma.stone = 0;
   incLastRes = null;
   incLastAt = 0;
 }
@@ -98,7 +99,7 @@ function trackIncome(snap: Snapshot): Resources {
     const dt = (now - incLastAt) / 1000;
     if (dt > 0.01 && dt < 5) {
       const a = Math.min(1, dt / 2.5); // ~2.5s smoothing window
-      (["wood", "food", "gold"] as (keyof Resources)[]).forEach((k) => {
+      (["wood", "food", "gold", "stone"] as (keyof Resources)[]).forEach((k) => {
         const rate = Math.max(0, r[k] - incLastRes![k]) / dt;
         incomeEma[k] += (rate - incomeEma[k]) * a;
       });
@@ -128,7 +129,7 @@ export const useStore = create<GameState>((set, get) => ({
   prev: null,
   curr: null,
   currReceivedAt: 0,
-  income: { wood: 0, food: 0, gold: 0 },
+  income: { wood: 0, food: 0, gold: 0, stone: 0 },
   selectedUnits: [],
   selectedBuilding: null,
   selectArmed: false,
@@ -185,7 +186,7 @@ export const useStore = create<GameState>((set, get) => ({
               seed: msg.seed,
               prev: null,
               curr: null,
-              income: { wood: 0, food: 0, gold: 0 },
+              income: { wood: 0, food: 0, gold: 0, stone: 0 },
               winner: null,
               reconnecting: false,
               paused: false,

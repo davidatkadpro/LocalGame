@@ -767,7 +767,9 @@ export class PixiGame {
             ? "tree"
             : n.kind === "gold"
               ? "gold"
-              : "food";
+              : n.kind === "stone"
+                ? "stone"
+                : "food";
         sp = new Sprite(textures[key]);
         sp.anchor.set(0.5);
         this.resourceLayer.addChild(sp);

@@ -476,8 +476,9 @@ legend: 🆕 brand new · 🔨 expand something we already have · ✅ shipped.
 - **Buildings:** `town_center`, `house`, `barracks`, `stable`, `tower`,
   `storehouse` (drop-off), `lumber_camp` / `mining_camp` / `mill` (specialised
   drop-offs), `farm`, `wall`, `gate`, `siege_workshop`.
-- **Resources:** `wood`, `food`, `gold` (3). Food from bushes, farms, and hunted
-  animals (sheep/cow → meat carcass).
+- **Resources:** `wood`, `food`, `gold`, `stone` (4). Food from bushes, farms,
+  and hunted animals (sheep/cow → meat carcass); stone is the defensive resource
+  (towers/fortifications), contested toward the map centre.
 - **Tech:** a working research system with three flat upgrades —
   `improvedTools`, `sharpenedBlades`, `paddedArmor`
   ([UpgradeId](packages/shared/src/types.ts#L23)).
@@ -541,7 +542,7 @@ command into levelled lines.
 [constants.ts](packages/shared/src/constants.ts),
 [sim.ts](packages/shared/src/sim.ts), [Hud.tsx](packages/client/src/ui/Hud.tsx).
 
-### 7.4 Stone as a 4th resource  — 🆕 **M**
+### 7.4 Stone as a 4th resource  — 🆕 **M** — ✅ done
 
 Split a hard resource out for defensive structures: **stone** for walls / towers
 / TC, **gold** stays for units & tech. Gives a concrete reason to fight over the
@@ -550,6 +551,19 @@ building costs.
 **Files.** [types.ts](packages/shared/src/types.ts),
 [constants.ts](packages/shared/src/constants.ts),
 [map.ts](packages/shared/src/map.ts), [Hud.tsx](packages/client/src/ui/Hud.tsx).
+**Status.** Shipped **stone** as the 4th `ResourceKind`. It's the **defensive
+sink**: the **Tower** now costs `75 wood / 50 stone` (gold dropped from it), so a
+turtle plan must mine stone — while gold stays for units & tech. Players start
+with **100 stone** (one tower's worth) and a small starter patch by each base;
+the bulk is **contested in the middle** — denser scatter/site rolls plus two
+**stone deposits flanking the map centre**, pulling armies to fight over
+fortification material. The **Mining Camp** is now the stone drop-off too
+(`CAMP_RESOURCE.mining_camp = [gold, stone]`, +20% to both). Full plumbing:
+`emptyResources`/`canAfford`/`payCost`/cancel+demolish refunds, a 🪨 top-bar tile
+with live +N/s income, cost badges, a stone node sprite, and grey minimap dots.
+Covered by `scripts/stone.test.ts` (plumbing, tower-cost shift, camp bonus, every
+map has stone, a worker mines+deposits it). **7.6 wall tiers** (palisade → stone →
+fortified) can now build on this as the next step.
 
 ### 7.5 Town Center fires arrows + Garrison  — 🔨 **M** — ✅ TC fires arrows (garrison pending)
 

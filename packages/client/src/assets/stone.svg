@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- A quarry stone pile: grey boulders (no nuggets — that's the gold node). -->
+  <defs>
+    <linearGradient id="sRock" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b8bcc2"/>
+      <stop offset="1" stop-color="#7c8186"/>
+    </linearGradient>
+    <radialGradient id="sBoulder" cx="0.35" cy="0.3" r="0.85">
+      <stop offset="0" stop-color="#cfd3d8"/>
+      <stop offset="0.7" stop-color="#9aa0a6"/>
+      <stop offset="1" stop-color="#6c7176"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="90" rx="32" ry="6" fill="#000000" opacity="0.18"/>
+  <!-- rubble base -->
+  <path d="M16 76 Q22 56 40 58 Q50 46 64 54 Q84 54 84 74 Q70 86 50 86 Q28 86 16 76Z" fill="url(#sRock)"/>
+  <path d="M16 76 Q50 86 84 74 Q70 82 50 84 Q30 82 16 76Z" fill="#000000" opacity="0.2"/>
+  <!-- chunky boulders -->
+  <path d="M30 70 l10 -16 l13 5 l-3 16 Z" fill="url(#sBoulder)" stroke="#5f6469" stroke-width="1"/>
+  <path d="M52 72 l8 -18 l16 6 l-4 17 Z" fill="url(#sBoulder)" stroke="#5f6469" stroke-width="1"/>
+  <path d="M38 78 l9 -10 l11 4 l-2 11 Z" fill="url(#sBoulder)" stroke="#5f6469" stroke-width="1"/>
+  <!-- facet highlights -->
+  <path d="M33 66 l6 -9 l5 2 Z" fill="#e3e6ea" opacity="0.5"/>
+  <path d="M56 66 l5 -10 l6 2 Z" fill="#e3e6ea" opacity="0.5"/>
+</svg>

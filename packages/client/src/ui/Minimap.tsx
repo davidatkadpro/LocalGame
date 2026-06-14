@@ -65,7 +65,14 @@ export function Minimap({ getViewport }: MinimapProps) {
           }
 
           for (const n of curr.resources) {
-            ctx.fillStyle = n.kind === "wood" ? "#37b24d" : n.kind === "gold" ? "#f1c40f" : "#e03131";
+            ctx.fillStyle =
+              n.kind === "wood"
+                ? "#37b24d"
+                : n.kind === "gold"
+                  ? "#f1c40f"
+                  : n.kind === "stone"
+                    ? "#adb5bd"
+                    : "#e03131";
             ctx.fillRect(n.tx * sx, n.ty * sy, sx + 0.6, sy + 0.6);
           }
           for (const b of curr.buildings) {

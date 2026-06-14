@@ -25,6 +25,7 @@ import gateUrl from "../assets/gate.svg";
 import siegeWorkshopUrl from "../assets/siege_workshop.svg";
 import treeUrl from "../assets/tree.svg";
 import goldUrl from "../assets/gold.svg";
+import stoneUrl from "../assets/stone.svg";
 import foodUrl from "../assets/food.svg";
 import sheepUrl from "../assets/sheep.svg";
 import cowUrl from "../assets/cow.svg";
@@ -75,6 +76,7 @@ export type SpriteKey =
   | "siege_workshop"
   | "tree"
   | "gold"
+  | "stone"
   | "food"
   | "sheep"
   | "cow"
@@ -124,6 +126,7 @@ const URLS: Record<SpriteKey, string> = {
   siege_workshop: siegeWorkshopUrl,
   tree: treeUrl,
   gold: goldUrl,
+  stone: stoneUrl,
   food: foodUrl,
   sheep: sheepUrl,
   cow: cowUrl,
