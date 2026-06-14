@@ -13,6 +13,7 @@ import {
   isWall,
   minAgeOfBuilding,
   rectContains,
+  resolveOrder,
   type AnimalDTO,
   type BuildingDTO,
   type BuildingType,
@@ -1780,100 +1781,24 @@ export class PixiGame {
   private issueCommandAt(wp: { x: number; y: number }): void {
     const snap = useStore.getState().curr;
     if (!snap) return;
-    const tx = Math.floor(wp.x);
-    const ty = Math.floor(wp.y);
+    // The whole intent cascade lives in the shared `resolveOrder`; here we only
+    // capture the gesture's context and play feedback for what it decided.
+    const cmd = resolveOrder(
+      { snapshot: snap, me: this.me(), isEnemy: (o) => this.isEnemy(o) },
+      { units: [...this.selected], building: this.selectedBuilding },
+      wp,
+      { queue: keys.has("shift") }, // Shift queues the order after the current one (desktop).
+    );
+    if (!cmd) return;
+    this.playSfxFor(cmd);
+    this.send(cmd);
+  }
 
-    // A selected building (no units) -> set its rally point.
-    if (this.selected.size === 0) {
-      if (this.selectedBuilding !== null) {
-        this.send({ c: "rally", building: this.selectedBuilding, tile: { x: tx, y: ty } });
-      }
-      return;
-    }
-    const units = [...this.selected];
-    // Holding Shift queues the order after the current one (desktop).
-    const queue = keys.has("shift");
-
-    // enemy unit? (allies in 2v2 are not valid targets)
-    for (const u of snap.units) {
-      if (this.isEnemy(u.owner) && Math.hypot(u.x - wp.x, u.y - wp.y) < 0.6) {
-        sfx.attack();
-        return this.send({ c: "attack", units, target: u.id, queue });
-      }
-    }
-    // enemy building?
-    for (const b of snap.buildings) {
-      const def = BUILDING_DEFS[b.type as BuildingType];
-      if (this.isEnemy(b.owner) && rectContains(b.tx, b.ty, def.size.w, def.size.h, tx, ty)) {
-        sfx.attack();
-        return this.send({ c: "attack", units, target: b.id, queue });
-      }
-    }
-    // wild animal? -> send workers to hunt it (kill it, then auto-gather the
-    // carcass). Only workers hunt; a worker-less selection falls through to move.
-    for (const a of snap.animals) {
-      if (Math.hypot(a.x - wp.x, a.y - wp.y) < 0.6) {
-        const workers = units.filter((id) => snap.units.find((u) => u.id === id)?.type === "worker");
-        if (workers.length === 0) break;
-        sfx.attack();
-        return this.send({ c: "attack", units: workers, target: a.id, queue });
-      }
-    }
-    // friendly building that needs work — unfinished (finish it) or damaged
-    // (repair it)? -> send workers. Both go through the `construct` command.
-    for (const b of snap.buildings) {
-      const def = BUILDING_DEFS[b.type as BuildingType];
-      const needsWork = b.progress < 1 || b.hp < def.hp;
-      if (b.owner === this.me() && needsWork && rectContains(b.tx, b.ty, def.size.w, def.size.h, tx, ty)) {
-        const workers = units.filter((id) => snap.units.find((u) => u.id === id)?.type === "worker");
-        if (workers.length > 0) {
-          sfx.command();
-          return this.send({ c: "construct", units: workers, building: b.id });
-        }
-      }
-    }
-    // friendly completed TC/tower? -> shelter the selected units inside it. A
-    // damaged one is caught above first (workers repair under fire); everything
-    // else garrisons. Garrisoned archers add arrows; eject from the build panel.
-    for (const b of snap.buildings) {
-      const def = BUILDING_DEFS[b.type as BuildingType];
-      if (
-        b.owner === this.me() &&
-        b.progress >= 1 &&
-        (def.garrisonCap ?? 0) > 0 &&
-        rectContains(b.tx, b.ty, def.size.w, def.size.h, tx, ty)
-      ) {
-        sfx.command();
-        return this.send({ c: "garrison", units, building: b.id });
-      }
-    }
-    // friendly completed farm? -> gather its hosted food node. The node sits on
-    // a single tile under the 2x2 footprint (no crop sprite), so a tap anywhere
-    // on the farm should assign workers — not just the exact node tile.
-    for (const b of snap.buildings) {
-      if (b.owner !== this.me() || b.type !== "farm" || b.progress < 1) continue;
-      const def = BUILDING_DEFS[b.type as BuildingType];
-      if (!rectContains(b.tx, b.ty, def.size.w, def.size.h, tx, ty)) continue;
-      const node = snap.resources.find(
-        (n) => n.owner === this.me() && rectContains(b.tx, b.ty, def.size.w, def.size.h, n.tx, n.ty),
-      );
-      if (!node) break;
-      const workers = units.filter((id) => snap.units.find((u) => u.id === id)?.type === "worker");
-      if (workers.length === 0) break; // no workers selected -> fall through to move
-      sfx.command();
-      return this.send({ c: "gather", units: workers, node: node.id, queue });
-    }
-    // resource node? (skip enemy-owned farm nodes — the server would reject the
-    // gather; fall through to a move so the order isn't silently dropped)
-    for (const n of snap.resources) {
-      if (n.tx === tx && n.ty === ty && (n.owner === undefined || n.owner === this.me())) {
-        sfx.command();
-        return this.send({ c: "gather", units, node: n.id, queue });
-      }
-    }
-    // otherwise move
-    sfx.command();
-    this.send({ c: "move", units, tile: { x: tx, y: ty }, queue });
+  /** Audio feedback for an issued order: attacks get the combat cue, a rally is
+   *  silent (matching prior behaviour), everything else gets the command blip. */
+  private playSfxFor(cmd: Command): void {
+    if (cmd.c === "attack") sfx.attack();
+    else if (cmd.c !== "rally") sfx.command();
   }
 
   /** Issue an attack-move for the current selection and disarm. */
