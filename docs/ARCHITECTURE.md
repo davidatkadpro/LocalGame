@@ -29,7 +29,14 @@ Pure TypeScript, no runtime deps. The contract + the rules.
 - `map.ts` — procedural map generation from a seed.
 - `pathfinding.ts` — A* on the grid.
 - `fog.ts` — per-player visibility.
+- `query.ts` — pure world reads (entity `*ById`, footprint/tile distances) shared by `sim` and `worker`.
+- `placement.ts` — `canPlaceBuilding` over a thin `PlacementView` (one rule, server + client ghost).
+- `combat.ts` — the single damage path (`applyDamage`/`damageBuilding`).
+- `intent.ts` — `resolveOrder`: click + selection → `Command` (the client's order cascade, pure).
+- `worker.ts` — worker economy state machine (`createWorkerSystem`), borrowing pathfinding from the sim.
 - `sim.ts` — `createWorld`, `applyCommand`, `tick`, `viewFor(player)`.
+
+Domain vocabulary and the seams between these modules are pinned in [CONTEXT.md](CONTEXT.md).
 
 ### `@bg/server`
 - `index.ts` — http server (static via `sirv`) + ws upgrade on `/ws`.
