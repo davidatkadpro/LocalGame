@@ -43,6 +43,10 @@ export const RELIC_GOLD_PER_SEC = 0.5; // gold/sec trickled to the holding playe
 export const STARTING_RESOURCES: Resources = { wood: 200, food: 200, gold: 120, stone: 100 };
 export const CARRY_CAPACITY = 10; // units carry this much before returning
 export const GATHER_PER_SEC = 6; // resource units harvested per second
+// How close a unit must be to act on a target. Must exceed sqrt(2) so a worker
+// standing diagonally-adjacent to a node tucked under a building (a farm's
+// hosted food node) still counts as in reach.
+export const REACH_DIST = 1.5;
 
 export interface UnitDef {
   type: UnitType;

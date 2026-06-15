@@ -7,8 +7,8 @@ import {
   ANIMAL_DEFS,
   BASE_POP_CAP,
   BUILDING_DEFS,
-  CARRY_CAPACITY,
   HARD_POP_CAP,
+  REACH_DIST,
   RELIC_CAPTURE_RADIUS,
   RELIC_GOLD_PER_SEC,
   STARTING_RESOURCES,
@@ -17,11 +17,8 @@ import {
   UNIT_DEFS,
   UNIT_SEPARATION,
   UPGRADE_DEFS,
-  campBonusFor,
   canAfford,
   emptyResources,
-  gatherRate,
-  isWall,
   minAgeOfBuilding,
   minAgeOfUnit,
   minAgeOfUpgrade,
@@ -36,6 +33,16 @@ import { generateMap } from "./map";
 import { canPlaceBuilding } from "./placement";
 import { findPath, isWalkable } from "./pathfinding";
 import {
+  animalById,
+  buildingById,
+  buildingNeedsWork,
+  distToBuilding,
+  distToTile,
+  nodeById,
+  unitById,
+} from "./query";
+import { createWorkerSystem } from "./worker";
+import {
   bytesToBase64,
   type BuildingDTO,
   type Command,
@@ -49,8 +56,6 @@ import type {
   EntityId,
   PlayerId,
   QueuedOrder,
-  ResourceKind,
-  ResourceNode,
   Unit,
   UnitType,
   Vec2,
@@ -73,12 +78,6 @@ export function sameTeam(world: World, a: PlayerId, b: PlayerId): boolean {
 }
 
 const ARRIVE_EPS = 0.06;
-// How close a unit must be to act on a target. Must exceed sqrt(2) so a worker
-// standing diagonally-adjacent to a node tucked under a building (a farm's
-// hosted food node) still counts as in reach.
-const REACH_DIST = 1.5;
-const REPAIR_HP_PER_SEC = 20; // hp a worker restores per second when repairing
-const REPAIR_COST_RATIO = 0.5; // repairing 0 -> full costs half the build cost
 
 // ---------------------------------------------------------------- world setup
 
@@ -178,44 +177,9 @@ function makeUnit(world: World, owner: PlayerId, type: UnitType, pos: Vec2): Uni
 
 // ---------------------------------------------------------------- lookups
 
-const unitById = (w: World, id: EntityId) => w.units.find((u) => u.id === id);
-const buildingById = (w: World, id: EntityId) => w.buildings.find((b) => b.id === id);
-const nodeById = (w: World, id: EntityId) => w.resourceNodes.find((n) => n.id === id);
-const animalById = (w: World, id: EntityId) => w.animals.find((a) => a.id === id);
-
 function buildingCenter(b: Building): Vec2 {
   const d = BUILDING_DEFS[b.type].size;
   return { x: b.tile.x + d.w / 2, y: b.tile.y + d.h / 2 };
-}
-
-/** A building a worker can still work on: unfinished, or finished but damaged. */
-function buildingNeedsWork(b: Building): boolean {
-  return b.progress < 1 || b.hp < BUILDING_DEFS[b.type].hp;
-}
-
-/** Charge the proportional cost of repairing `heal` hp of `b`. Returns false if
- *  the owner can't afford it (the repair should then stop). Repairing a building
- *  from 0 to full costs REPAIR_COST_RATIO of its build cost. */
-function payRepair(world: World, b: Building, heal: number): boolean {
-  const def = BUILDING_DEFS[b.type];
-  const frac = (heal / def.hp) * REPAIR_COST_RATIO;
-  const wood = (def.cost.wood ?? 0) * frac;
-  const food = (def.cost.food ?? 0) * frac;
-  const gold = (def.cost.gold ?? 0) * frac;
-  const res = world.players[b.owner].resources;
-  if (res.wood < wood || res.food < food || res.gold < gold) return false;
-  res.wood -= wood;
-  res.food -= food;
-  res.gold -= gold;
-  return true;
-}
-
-function distToBuilding(pos: Vec2, b: Building): number {
-  const d = BUILDING_DEFS[b.type].size;
-  // distance to nearest point of the footprint rectangle
-  const cx = Math.max(b.tile.x, Math.min(pos.x, b.tile.x + d.w));
-  const cy = Math.max(b.tile.y, Math.min(pos.y, b.tile.y + d.h));
-  return dist(pos, { x: cx, y: cy });
 }
 
 /** True if a *built* gate at this tile is open to `mover` — its owner is on the
@@ -250,22 +214,6 @@ export function tileBlockedFor(world: World, tx: number, ty: number, mover?: Pla
   return buildingBlocker(world, undefined, mover)(tx, ty);
 }
 
-function nearestDropOff(world: World, owner: PlayerId, pos: Vec2): Building | null {
-  let best: Building | null = null;
-  let bestD = Infinity;
-  for (const b of world.buildings) {
-    if (b.owner !== owner) continue;
-    if (b.progress < 1) continue;
-    if (!BUILDING_DEFS[b.type].isDropOff) continue;
-    const d = distToBuilding(pos, b);
-    if (d < bestD) {
-      bestD = d;
-      best = b;
-    }
-  }
-  return best;
-}
-
 /**
  * Nearest walkable tile on the ring just outside a building's footprint.
  * Units must stand adjacent to a building (not on it) to deposit or construct,
@@ -296,6 +244,17 @@ function pathToBuilding(world: World, u: Unit, b: Building): Vec2[] {
   const target = approachTile(world, b, u.pos) ?? buildingCenter(b);
   return findPath(world.map, u.pos, target, buildingBlocker(world, b.id, u.owner));
 }
+
+/** A unit's path to the center of a tile, routed around building footprints. The
+ *  worker loop borrows this (and `pathToBuilding`) rather than the blocker
+ *  geometry itself — see `WorkerServices`. */
+function pathToTile(world: World, u: Unit, tile: Vec2): Vec2[] {
+  return findPath(world.map, u.pos, tileCenterOf(tile), buildingBlocker(world, undefined, u.owner));
+}
+
+// The worker economy state machine (gather/deposit/build) lives in `worker.ts`,
+// bound here to the two pathfinding services it needs from the sim.
+const workerSys = createWorkerSystem({ pathToBuilding, pathToTile });
 
 // ---------------------------------------------------------------- commands
 
@@ -962,33 +921,6 @@ function gatherableNodeAt(world: World, x: number, y: number, owner: PlayerId) {
   );
 }
 
-// How far a worker will roam on its own to find the next node of the same kind
-// after exhausting one, before giving up and going idle.
-const AUTO_GATHER_SEEK = 18;
-
-/** Nearest non-empty node of `kind` a worker may harvest (neutral, or its own
- *  farm), within `maxDist`. Drives auto-advance to the next tree/gold/bush. */
-function nearestGatherNode(
-  world: World,
-  owner: PlayerId,
-  pos: Vec2,
-  kind: ResourceKind,
-  maxDist: number,
-): ResourceNode | null {
-  let best: ResourceNode | null = null;
-  let bestD = maxDist;
-  for (const n of world.resourceNodes) {
-    if (n.kind !== kind || n.amount <= 0) continue;
-    if (n.owner !== undefined && n.owner !== owner) continue; // enemy farm
-    const d = distToTile(pos, n.tile);
-    if (d < bestD) {
-      bestD = d;
-      best = n;
-    }
-  }
-  return best;
-}
-
 function spawnFromBuilding(world: World, b: Building, type: UnitType) {
   const d = BUILDING_DEFS[b.type].size;
   // spawn just outside the footprint, on a walkable tile if possible
@@ -1255,15 +1187,15 @@ function updateUnit(world: World, u: Unit): void {
       bumpStuck(u, beforeDist);
       if (u.path.length === 0 || u.stuck >= STUCK_LIMIT) {
         u.stuck = 0;
-        tryDeposit(world, u);
+        workerSys.tryDeposit(world, u);
       }
       return;
     }
     case "gathering":
-      doGather(world, u);
+      workerSys.doGather(world, u);
       return;
     case "building":
-      doBuild(world, u);
+      workerSys.doBuild(world, u);
       return;
     case "attacking":
       doAttack(world, u);
@@ -1455,184 +1387,6 @@ function onArrive(world: World, u: Unit): void {
   }
   u.state = "idle";
   u.targetTile = null;
-}
-
-function doGather(world: World, u: Unit): void {
-  const node = u.targetEntity !== null ? nodeById(world, u.targetEntity) : null;
-  if (!node) {
-    u.state = "idle";
-    return;
-  }
-  if (distToTile(u.pos, node.tile) > REACH_DIST) {
-    // walk to it
-    u.state = "moving";
-    u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world, undefined, u.owner));
-    return;
-  }
-  u.lastGatherNode = node.id; // remember it so we can resume after a build detour
-  if (!u.carry || u.carry.kind !== node.kind) u.carry = { kind: node.kind, amount: 0 };
-  // A specialised camp boosts its resource when it's the nearest drop-off, so
-  // placing the right camp by the right patch pays off (§7.2).
-  const drop = nearestDropOff(world, u.owner, u.pos);
-  const camp = drop ? campBonusFor(drop.type, node.kind) : 1;
-  const rate = gatherRate(world.players[u.owner]) * camp;
-  const take = Math.min(rate * TICK_DT, node.amount, CARRY_CAPACITY - u.carry.amount);
-  node.amount -= take;
-  u.carry.amount += take;
-  if (u.carry.amount >= CARRY_CAPACITY || node.amount <= 0) {
-    startReturn(world, u);
-  }
-}
-
-function startReturn(world: World, u: Unit): void {
-  const drop = nearestDropOff(world, u.owner, u.pos);
-  if (!drop) {
-    u.state = "idle";
-    return;
-  }
-  u.state = "returning";
-  u.path = pathToBuilding(world, u, drop);
-}
-
-function tryDeposit(world: World, u: Unit): void {
-  const drop = nearestDropOff(world, u.owner, u.pos);
-  if (drop && distToBuilding(u.pos, drop) <= REACH_DIST + 0.6 && u.carry) {
-    const res = world.players[u.owner].resources;
-    // Round to kill floating-point dust accumulated from per-tick (rate * TICK_DT) gathers,
-    // which otherwise surfaces as 360.000000000001 / 494.99999999999625 in the HUD.
-    res[u.carry.kind] = Math.round((res[u.carry.kind] + u.carry.amount) * 1000) / 1000;
-    world.stats[u.owner].resourcesGathered += u.carry.amount;
-    const kind = u.carry.kind;
-    u.carry = null;
-    const node = u.targetEntity !== null ? nodeById(world, u.targetEntity) : null;
-    // Resume the same node if it still has anything left. Owned farm nodes
-    // persist even at 0 (they regrow), so stick with them too.
-    if (node && (node.amount > 0 || node.owner !== undefined)) {
-      u.state = "moving";
-      u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world, undefined, u.owner));
-    } else {
-      // Node exhausted/gone: auto-advance to the nearest same-kind node within
-      // reach and keep gathering, instead of standing idle by an empty patch.
-      const next = nearestGatherNode(world, u.owner, u.pos, kind, AUTO_GATHER_SEEK);
-      if (next) {
-        u.targetEntity = next.id;
-        u.lastGatherNode = next.id;
-        u.state = "moving";
-        u.path = findPath(world.map, u.pos, tileCenterOf(next.tile), buildingBlocker(world, undefined, u.owner));
-      } else {
-        u.state = "idle";
-        u.targetEntity = null;
-      }
-    }
-  } else if (drop) {
-    u.state = "returning";
-    u.path = pathToBuilding(world, u, drop);
-  } else {
-    u.state = "idle";
-  }
-}
-
-function doBuild(world: World, u: Unit): void {
-  const b = u.targetEntity !== null ? buildingById(world, u.targetEntity) : null;
-  if (!b || !buildingNeedsWork(b)) {
-    // Whole (finished and undamaged) or gone. Chaining along a wall line keeps a
-    // single worker building the whole run; otherwise go back to gathering.
-    if (b && isWall(b.type) && chainToNextWall(world, u, b.type)) return;
-    resumeGatherOrIdle(world, u);
-    return;
-  }
-  if (distToBuilding(u.pos, b) > REACH_DIST + 0.6) {
-    u.state = "moving";
-    u.path = pathToBuilding(world, u, b);
-    return;
-  }
-  const def = BUILDING_DEFS[b.type];
-  if (b.progress < 1) {
-    // Construction: advance progress, scaling hp with it.
-    b.progress = Math.min(1, b.progress + (TICK_DT * 1000) / def.buildMs);
-    b.hp = Math.max(b.hp, Math.floor(def.hp * (0.1 + 0.9 * b.progress)));
-    if (b.progress >= 1) {
-      b.hp = def.hp;
-      onBuildingComplete(world, b);
-      if (isWall(b.type) && chainToNextWall(world, u, b.type)) return;
-      resumeGatherOrIdle(world, u);
-    }
-    return;
-  }
-  // Repair: a finished but damaged building. Restore hp over time, paying a
-  // proportional materials cost; stop if the owner can't afford it.
-  const heal = Math.min(REPAIR_HP_PER_SEC * TICK_DT, def.hp - b.hp);
-  if (!payRepair(world, b, heal)) {
-    resumeGatherOrIdle(world, u);
-    return;
-  }
-  b.hp = Math.min(def.hp, b.hp + heal);
-  if (b.hp >= def.hp) {
-    b.hp = def.hp;
-    resumeGatherOrIdle(world, u);
-  }
-}
-
-/**
- * After finishing a wall, send the builder to the nearest unfinished friendly
- * wall nearby so one worker constructs a whole dragged wall line on its own.
- */
-function chainToNextWall(world: World, u: Unit, wallType: BuildingType): boolean {
-  let best: Building | null = null;
-  let bestD = 12; // only chain to walls within a dozen tiles
-  for (const b of world.buildings) {
-    // Same tier only, so a dragged line of one wall kind builds as a unit and a
-    // worker doesn't hop onto a different-tier wall it wasn't dragging.
-    if (b.owner !== u.owner || b.type !== wallType || b.progress >= 1) continue;
-    const d = distToBuilding(u.pos, b);
-    if (d < bestD) {
-      bestD = d;
-      best = b;
-    }
-  }
-  if (!best) return false;
-  u.targetEntity = best.id;
-  u.state = "moving";
-  u.path = pathToBuilding(world, u, best);
-  return true;
-}
-
-/** One-time setup when a building finishes: farms spawn their food node. */
-function onBuildingComplete(world: World, b: Building): void {
-  world.stats[b.owner].buildingsBuilt++;
-  // §7.10: a finished Wonder starts ticking its victory countdown.
-  if (b.type === "wonder") b.wonderTimer = WONDER_COUNTDOWN_MS;
-  const def = BUILDING_DEFS[b.type];
-  if (def.farm && (b.farmNodeId === undefined || b.farmNodeId === null)) {
-    const node = {
-      id: world.nextEntityId++,
-      kind: "food" as const,
-      tile: { x: b.tile.x, y: b.tile.y },
-      amount: def.farm.capacity,
-      owner: b.owner,
-    };
-    world.resourceNodes.push(node);
-    b.farmNodeId = node.id;
-  }
-}
-
-/**
- * After a worker finishes (or abandons) a build, send it back to the resource
- * node it was last gathering if that node still has anything left — otherwise
- * just go idle. Saves the player from re-tasking every builder by hand.
- */
-function resumeGatherOrIdle(world: World, u: Unit): void {
-  u.targetEntity = null;
-  if (u.type === "worker" && u.lastGatherNode !== null) {
-    const node = nodeById(world, u.lastGatherNode);
-    if (node && node.amount > 0) {
-      u.targetEntity = node.id;
-      u.state = "moving";
-      u.path = findPath(world.map, u.pos, tileCenterOf(node.tile), buildingBlocker(world, undefined, u.owner));
-      return;
-    }
-  }
-  u.state = "idle";
 }
 
 function doAttack(world: World, u: Unit): void {
@@ -1835,10 +1589,6 @@ function tryStandGround(world: World, u: Unit): void {
   u.state = "attacking";
   u.retaliating = true;
   u.path = [];
-}
-
-function distToTile(pos: Vec2, tile: Vec2): number {
-  return dist(pos, { x: tile.x + 0.5, y: tile.y + 0.5 });
 }
 
 function recomputePop(world: World): void {

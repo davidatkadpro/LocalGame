@@ -7,6 +7,8 @@ export * from "./map";
 export * from "./placement";
 export * from "./combat";
 export * from "./intent";
+export * from "./query";
+export * from "./worker";
 export * from "./pathfinding";
 export * from "./fog";
 export * from "./sim";
