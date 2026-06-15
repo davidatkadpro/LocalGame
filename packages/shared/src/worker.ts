@@ -52,6 +52,10 @@ export interface WorkerSystem {
   doGather(world: World, u: Unit): void;
   tryDeposit(world: World, u: Unit): void;
   doBuild(world: World, u: Unit): void;
+  /** Send a worker back to its last node (if it still has anything) or idle —
+   *  used by the sim when a worker disengages from a fight, so defending against
+   *  a raid doesn't leave the economy frozen. */
+  resumeGather(world: World, u: Unit): void;
 }
 
 export function createWorkerSystem(svc: WorkerServices): WorkerSystem {
@@ -103,11 +107,16 @@ export function createWorkerSystem(svc: WorkerServices): WorkerSystem {
     const wood = (def.cost.wood ?? 0) * frac;
     const food = (def.cost.food ?? 0) * frac;
     const gold = (def.cost.gold ?? 0) * frac;
+    // Stone too — towers and stone/fortified walls are paid for in stone, so
+    // repairing them must also cost stone (otherwise the §7.4 stone economy is
+    // free to maintain, defeating the point of stone-gated fortification).
+    const stone = (def.cost.stone ?? 0) * frac;
     const res = world.players[b.owner].resources;
-    if (res.wood < wood || res.food < food || res.gold < gold) return false;
+    if (res.wood < wood || res.food < food || res.gold < gold || res.stone < stone) return false;
     res.wood -= wood;
     res.food -= food;
     res.gold -= gold;
+    res.stone -= stone;
     return true;
   }
 
@@ -289,5 +298,5 @@ export function createWorkerSystem(svc: WorkerServices): WorkerSystem {
     u.state = "idle";
   }
 
-  return { doGather, tryDeposit, doBuild };
+  return { doGather, tryDeposit, doBuild, resumeGather: resumeGatherOrIdle };
 }

@@ -96,6 +96,37 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
   const nearSpawn = (x: number, y: number) =>
     spawns.some((s) => x >= s.x - 4 && x <= s.x + 7 && y >= s.y - 4 && y <= s.y + 7);
 
+  // ---- Symmetry: keep the contested economy *fair* between players ----------
+  // Random scatter/groves/sites are generated once and replicated to each spawn's
+  // image, so no player gets a richer neighbourhood than another. 4 players → a
+  // 4-fold rotation about centre (one image per corner); otherwise a 180° point
+  // mirror (fair for the 2-player diagonal). 3 players is inherently asymmetric:
+  // the mirror balances the two diagonal corners; the third shares the map.
+  const orbitSize = playerCount === 4 ? 4 : 2;
+  const orbit = (x: number, y: number): Vec2[] => {
+    if (playerCount === 4) {
+      // 90° rotations of a square grid: (x,y) → (W-1-y, x) → … (W==H here).
+      return [
+        { x, y },
+        { x: width - 1 - y, y: x },
+        { x: width - 1 - x, y: height - 1 - y },
+        { x: y, y: height - 1 - x },
+      ];
+    }
+    return [
+      { x, y },
+      { x: width - 1 - x, y: height - 1 - y },
+    ];
+  };
+  // Place a node and its symmetric images, skipping any image that falls in a
+  // spawn's clear zone (so a mirror never lands on another player's town centre).
+  const placeMirrored = (x: number, y: number, kind: ResourceKind) => {
+    for (const p of orbit(x, y)) {
+      if (nearSpawn(p.x, p.y)) continue;
+      placeNode(p.x, p.y, kind);
+    }
+  };
+
   // Starter resources next to each spawn so the early economy works immediately.
   for (const s of spawns) {
     for (let i = 0; i < 6; i++) placeNode(s.x + 4 + (i % 3), s.y - 2 + Math.floor(i / 3), "wood");
@@ -110,21 +141,23 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
   }
 
   // Scatter extra resources across the map to fight over (denser than before).
-  const scatter = Math.floor((width * height) / 50);
+  // The base count is divided by the orbit size, since each draw is mirrored to
+  // every spawn — keeping total density roughly constant regardless of player
+  // count while guaranteeing fairness.
+  const scatter = Math.floor((width * height) / 50 / orbitSize);
   for (let i = 0; i < scatter; i++) {
     const x = rng.int(width);
     const y = rng.int(height);
-    if (nearSpawn(x, y)) continue;
     const roll = rng.next();
     const kind: ResourceKind =
       roll < 0.55 ? "wood" : roll < 0.75 ? "food" : roll < 0.9 ? "gold" : "stone";
-    placeNode(x, y, kind);
+    placeMirrored(x, y, kind);
   }
 
   // Dense forests: roundish wood groves so the map reads as having real woods to
   // harvest and manoeuvre through (forest tiles are walkable), not just sparse
   // single trees. Gaps are left so a grove isn't a solid wall.
-  const groves = 6;
+  const groves = 3; // mirrored to every spawn (×orbitSize: 6 for 2p, 12 for 4p)
   for (let i = 0; i < groves; i++) {
     const cx = rng.range(8, width - 8);
     const cy = rng.range(8, height - 8);
@@ -134,9 +167,8 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
         const dx = x - cx;
         const dy = y - cy;
         if (dx * dx + dy * dy > r * r) continue;
-        if (nearSpawn(x, y)) continue;
         if (rng.next() < 0.28) continue; // ~72% of grove tiles get a tree
-        placeNode(x, y, "wood");
+        placeMirrored(x, y, "wood");
       }
     }
   }
@@ -179,7 +211,7 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
   // A handful of dense "resource sites" — clusters worth expanding to and
   // fighting over, rather than uniform scatter. Each is a single kind so a site
   // reads as "the gold patch", "the woods", etc.
-  const sites = 5;
+  const sites = orbitSize === 4 ? 2 : 3; // mirrored to every spawn (×orbitSize)
   for (let i = 0; i < sites; i++) {
     const cx = rng.range(10, width - 10);
     const cy = rng.range(10, height - 10);
@@ -190,8 +222,7 @@ export function generateMap(seed: number, playerCount: number): GeneratedMap {
     for (let n = 0; n < nodes; n++) {
       const x = Math.round(cx + rng.range(-2, 2));
       const y = Math.round(cy + rng.range(-2, 2));
-      if (nearSpawn(x, y)) continue;
-      placeNode(x, y, kind);
+      placeMirrored(x, y, kind);
     }
   }
 

@@ -59,7 +59,8 @@ function openSpot(world: World, type: BuildingType): { x: number; y: number } | 
 // ---- 1. minAge tagging --------------------------------------------------
 check("worker + house are Dark-Age", minAgeOfUnit("worker") === 0 && minAgeOfBuilding("house") === 0);
 check("soldier/archer + barracks/tower are Feudal", minAgeOfUnit("soldier") === 1 && minAgeOfBuilding("barracks") === 1 && minAgeOfBuilding("tower") === 1);
-check("ram + siege workshop are Imperial", minAgeOfUnit("ram") === 2 && minAgeOfBuilding("siege_workshop") === 2);
+check("ram + siege workshop are Feudal (a wall-breaker)", minAgeOfUnit("ram") === 1 && minAgeOfBuilding("siege_workshop") === 1);
+check("mangonel + trebuchet stay Imperial", minAgeOfUnit("mangonel") === 2 && minAgeOfUnit("trebuchet") === 2);
 check("Sharpened Blades is Feudal-gated", minAgeOfUpgrade("sharpenedBlades") === 1);
 check(
   "age names",
@@ -103,13 +104,15 @@ check(
   applyCommand(world, 0, { c: "research", building: bar.id, upgrade: "sharpenedBlades" });
   check("Feudal allows Sharpened Blades", bar.research === "sharpenedBlades");
 
-  // ram still gated to Imperial even with a (hypothetical) workshop at Feudal
+  // the ram is the Feudal wall-breaker; ranged siege stays Imperial
   const ws = addBuilding(world, 0, "siege_workshop", 4, 4);
   applyCommand(world, 0, { c: "train", building: ws.id, unit: "ram" });
-  check("Feudal still blocks a ram (Imperial)", ws.queue.length === 0);
+  check("Feudal allows a ram", ws.queue.length === 1 && ws.queue[0] === "ram");
+  applyCommand(world, 0, { c: "train", building: ws.id, unit: "mangonel" });
+  check("Feudal still blocks a mangonel (Imperial)", !ws.queue.includes("mangonel"));
   p.age = 2;
-  applyCommand(world, 0, { c: "train", building: ws.id, unit: "ram" });
-  check("Imperial allows a ram", ws.queue.length === 1 && ws.queue[0] === "ram");
+  applyCommand(world, 0, { c: "train", building: ws.id, unit: "mangonel" });
+  check("Imperial allows a mangonel", ws.queue.includes("mangonel"));
 }
 
 // ---- 4. advancing: prereq + cost + timed, then the age bumps -------------

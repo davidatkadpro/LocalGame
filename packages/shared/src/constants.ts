@@ -66,6 +66,10 @@ export interface UnitDef {
   /** §7.7 siege splash: when set, an attack also damages every enemy unit within
    *  this radius (tiles) of the target — the mangonel's anti-clump role. */
   splashRadius?: number;
+  /** skirmisher: a ranged unit that kites — when auto-engaging (attack-move /
+   *  aggressive / retaliation, not a direct attack order or stand-ground) it
+   *  backs away from a closing melee threat to keep firing at range. */
+  skirmish?: boolean;
 }
 
 export const UNIT_DEFS: Record<UnitType, UnitDef> = {
@@ -109,6 +113,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     attackMs: 1400,
     trainedAt: "barracks",
     minAge: 1, // Feudal
+    skirmish: true, // kites closing melee to leverage its range (the RPS counter)
   },
   cavalry: {
     type: "cavalry",
@@ -136,7 +141,8 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     range: 0.9,
     attackMs: 2000,
     trainedAt: "siege_workshop",
-    minAge: 2, // Imperial
+    minAge: 1, // Feudal — a wall-breaker so a stone-walled base isn't uncrackable
+               // until Imperial (ranged siege below stays Imperial). Tunable.
   },
   mangonel: {
     type: "mangonel",
@@ -429,7 +435,8 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     isDropOff: false,
     canTrain: ["ram", "mangonel", "trebuchet"], // gates siege behind a dedicated tech building
     buildable: true,
-    minAge: 2, // Imperial
+    minAge: 1, // Feudal — available with the ram; mangonel/trebuchet are still
+               // age-gated to Imperial by their own minAge (enforced on train).
   },
   wonder: {
     type: "wonder",
@@ -596,7 +603,8 @@ export interface AgeDef {
   advanceCost: Partial<Resources>;
   /** time to advance into this age, ms */
   advanceMs: number;
-  /** at least one completed building of one of these types is required to advance */
+  /** prerequisite to advance: at least one completed building of *any one* of
+   *  these types (OR, not all) — see the `.some(...)` check in `advanceAge`. */
   prereq: BuildingType[];
 }
 

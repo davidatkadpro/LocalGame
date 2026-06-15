@@ -795,18 +795,30 @@ function countQueued(player: { id: PlayerId }, world: World): number {
 
 /** Adapter: run the shared placement rule over the authoritative `World`. */
 export function placementValid(world: World, type: BuildingType, tile: Vec2): boolean {
-  return canPlaceBuilding(
-    {
-      map: world.map,
-      hasResourceAt: (x, y) => world.resourceNodes.some((n) => n.tile.x === x && n.tile.y === y),
-      buildingFootprints: world.buildings.map((b) => {
-        const s = BUILDING_DEFS[b.type].size;
-        return { x: b.tile.x, y: b.tile.y, w: s.w, h: s.h };
-      }),
-    },
-    type,
-    tile,
-  );
+  if (
+    !canPlaceBuilding(
+      {
+        map: world.map,
+        hasResourceAt: (x, y) => world.resourceNodes.some((n) => n.tile.x === x && n.tile.y === y),
+        buildingFootprints: world.buildings.map((b) => {
+          const s = BUILDING_DEFS[b.type].size;
+          return { x: b.tile.x, y: b.tile.y, w: s.w, h: s.h };
+        }),
+      },
+      type,
+      tile,
+    )
+  ) {
+    return false;
+  }
+  // Don't drop a footprint on top of a unit — the blocked rect would trap it
+  // inside (its neighbours all become impassable). The player just re-clicks a
+  // clear spot. (The pure rule above is unit-agnostic; this is the World adapter.)
+  const d = BUILDING_DEFS[type].size;
+  for (const u of world.units) {
+    if (rectContains(tile.x, tile.y, d.w, d.h, Math.floor(u.pos.x), Math.floor(u.pos.y))) return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------- tick
@@ -956,19 +968,22 @@ function tickTowers(world: World): void {
     if (b.attackCooldown > 0) continue;
     // §7.5b garrisoned archers add arrows: the volley is the building's own shot
     // plus one per sheltered archer, spread across the nearest foes (so it also
-    // peels a crowd). Range extends to the archers' reach when they out-range the
-    // building; with no garrison this is exactly the old single-shot behaviour.
+    // peels a crowd). With no garrison this is exactly the single-shot behaviour.
     const archers = (b.garrison ?? []).filter((g) => g.type === "archer").length;
-    const range = archers > 0 ? Math.max(def.attack.range, UNIT_DEFS.archer.range) : def.attack.range;
+    const range = def.attack.range;
     const foes = world.units
       .filter((u) => !sameTeam(world, u.owner, b.owner) && u.hp > 0)
       .map((u) => ({ u, d: distToBuilding(u.pos, b) }))
       .filter((x) => x.d < range)
       .sort((a, c) => a.d - c.d);
     if (foes.length === 0) continue;
+    // Sheltered archers shoot with their owner's upgraded/aged damage, not the raw
+    // base — a Blacksmith-teched garrison should hit as hard as those archers would
+    // in the field.
+    const archerDmg = unitDamage(world.players[b.owner], "archer");
     for (let i = 0; i < 1 + archers; i++) {
       const t = foes[i % foes.length].u;
-      const dmg = i === 0 ? def.attack.damage : UNIT_DEFS.archer.damage;
+      const dmg = i === 0 ? def.attack.damage : archerDmg;
       // A tower shot has no counter table and never makes the victim retaliate
       // (you can't fight back against a building), so no attacker/source is passed.
       applyDamage(world, t, dmg);
@@ -1251,6 +1266,10 @@ function stepAlongPath(world: World, u: Unit): void {
 const AVOID_LOOKAHEAD = 1.1; // tiles ahead we watch for a blocking unit
 const AVOID_STRENGTH = 0.6; // fraction of a step spent sliding sideways
 
+// Kiting tuning (skirmishers).
+const KITE_DANGER = 2.5; // a melee threat closer than this makes a skirmisher back off
+const KITE_MELEE_RANGE = 1.5; // attack range at/below which an enemy counts as "melee"
+
 /** True if a unit may occupy the point (walkable terrain, no building footprint). */
 function stepOpen(world: World, x: number, y: number, mover?: PlayerId): boolean {
   const tx = Math.floor(x);
@@ -1389,10 +1408,61 @@ function onArrive(world: World, u: Unit): void {
   u.targetTile = null;
 }
 
+/** End a unit's engagement. A worker goes back to the node it was last gathering
+ *  (if it still has anything) rather than standing idle, so fighting off a raid
+ *  doesn't permanently freeze the economy; everything else just falls idle. */
+function endEngagement(world: World, u: Unit): void {
+  if (u.type === "worker") workerSys.resumeGather(world, u);
+  else u.state = "idle";
+}
+
+/**
+ * Skirmisher kiting: when a ranged skirmisher (archer) is auto-engaging and an
+ * enemy *melee* unit has closed inside the danger band, take one step directly
+ * away from it — but never so far that the current target leaves the skirmisher's
+ * own range. This is what lets archers leverage their reach (the archer→soldier
+ * counter) instead of being run down. Skipped for a direct attack order and for
+ * stand-ground (both mean "hold and fire"). Deterministic — no RNG.
+ */
+function tryKite(world: World, u: Unit): void {
+  if (!UNIT_DEFS[u.type].skirmish || u.stance === "standGround") return;
+  const auto = u.aggro !== null || isRetaliation(u);
+  if (!auto) return;
+  const mySpeed = UNIT_DEFS[u.type].speed;
+  let threat: Unit | null = null;
+  let bestD = KITE_DANGER;
+  for (const e of world.units) {
+    if (e.hp <= 0 || sameTeam(world, e.owner, u.owner)) continue;
+    if (UNIT_DEFS[e.type].range > KITE_MELEE_RANGE) continue; // only melee threats chase us
+    // Can't outrun something at least as fast — a cavalry runs an archer down, so
+    // the archer holds and fires instead of fleeing in vain (preserves cav > archer).
+    if (UNIT_DEFS[e.type].speed >= mySpeed) continue;
+    const d = dist(u.pos, e.pos);
+    if (d < bestD) {
+      bestD = d;
+      threat = e;
+    }
+  }
+  if (!threat) return;
+  const dx = u.pos.x - threat.pos.x;
+  const dy = u.pos.y - threat.pos.y;
+  const m = Math.hypot(dx, dy) || 1;
+  const step = UNIT_DEFS[u.type].speed * TICK_DT;
+  const nx = u.pos.x + (dx / m) * step;
+  const ny = u.pos.y + (dy / m) * step;
+  if (!stepOpen(world, nx, ny, u.owner)) return; // cornered — stand and fire
+  // Don't retreat out of range of the thing we're shooting.
+  const tgt = u.targetEntity !== null ? unitById(world, u.targetEntity) : null;
+  if (tgt && dist({ x: nx, y: ny }, tgt.pos) > UNIT_DEFS[u.type].range) return;
+  u.pos.x = nx;
+  u.pos.y = ny;
+  u.path = [];
+}
+
 function doAttack(world: World, u: Unit): void {
   if (u.targetEntity === null) {
     if (resumeAggro(world, u)) return;
-    u.state = "idle";
+    endEngagement(world, u);
     return;
   }
   const def = UNIT_DEFS[u.type];
@@ -1427,7 +1497,7 @@ function doAttack(world: World, u: Unit): void {
         return;
       }
     }
-    u.state = "idle";
+    endEngagement(world, u);
     return;
   }
   // Hunting wild fauna: chase the wandering animal down, then chip away at it.
@@ -1452,7 +1522,7 @@ function doAttack(world: World, u: Unit): void {
   if (sameTeam(world, targetOwner, u.owner)) {
     u.targetEntity = null;
     if (resumeAggro(world, u)) return;
-    u.state = "idle";
+    endEngagement(world, u);
     return;
   }
 
@@ -1474,8 +1544,8 @@ function doAttack(world: World, u: Unit): void {
         u.targetEntity = null;
         u.attackedBy = null;
         u.retaliating = false;
-        u.state = "idle";
         u.path = [];
+        endEngagement(world, u);
         return;
       }
     }
@@ -1509,6 +1579,8 @@ function doAttack(world: World, u: Unit): void {
     } else if (targetBuilding) damageBuilding(targetBuilding, dmg, u.type);
     u.attackCooldown = def.attackMs;
   }
+  // After firing (or while reloading), a skirmisher repositions to keep its range.
+  tryKite(world, u);
 }
 
 /**
@@ -1551,7 +1623,11 @@ function tryRetaliate(world: World, u: Unit): void {
     u.attackedBy = null;
     return;
   }
-  if (dist(u.pos, foe.pos) > UNIT_DEFS[u.type].sight) return; // too far — hold position
+  // A worker only fights back against an *adjacent* attacker — it won't abandon
+  // the economy to chase a raider across the map (and get kited into the open).
+  // Combat units use their full sight as before.
+  const reach = u.type === "worker" ? REACH_DIST : UNIT_DEFS[u.type].sight;
+  if (dist(u.pos, foe.pos) > reach) return; // too far — hold position
   u.targetEntity = foe.id;
   u.state = "attacking";
   u.retaliating = true; // leashed engagement (see isRetaliation / doAttack)

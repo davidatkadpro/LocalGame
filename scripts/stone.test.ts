@@ -88,5 +88,46 @@ check("lumber camp does NOT boost stone", campBonusFor("lumber_camp", "stone") =
   }
 }
 
+// ---- 6. repairing a stone-costing building charges stone -------------------
+// A tower costs stone to build, so repairing it must also cost stone (not just
+// wood). Place a damaged tower, send a worker to repair, assert stone dropped.
+{
+  const world = createWorld(7, PS);
+  const fog = createFog(world);
+  const def = BUILDING_DEFS.tower;
+  const worker = world.units.find((u) => u.owner === 0 && u.type === "worker")!;
+  // A clear-ish spot away from the TC for the tower; sit the worker beside it.
+  const tx = Math.floor(worker.pos.x) + 2;
+  const ty = Math.floor(worker.pos.y);
+  const tower = {
+    id: world.nextEntityId++,
+    owner: 0,
+    type: "tower" as const,
+    tile: { x: tx, y: ty },
+    hp: Math.floor(def.hp * 0.4), // damaged
+    progress: 1,
+    queue: [],
+    produceTimer: 0,
+    rally: null,
+    research: null,
+    researchTimer: 0,
+    attackCooldown: 0,
+  };
+  world.buildings.push(tower);
+  worker.pos = { x: tx - 1, y: ty + 0.5 }; // adjacent to the footprint
+  world.units = [worker];
+  // Give the player ample resources so only the repair spend is measured.
+  world.players[0].resources = { wood: 1000, food: 1000, gold: 1000, stone: 1000 };
+  const beforeStone = world.players[0].resources.stone;
+  applyCommand(world, 0, { c: "construct", units: [worker.id], building: tower.id });
+  for (let i = 0; i < 120; i++) tick(world, fog);
+  check(
+    "repairing a tower consumes stone",
+    world.players[0].resources.stone < beforeStone,
+    `stone ${beforeStone} -> ${world.players[0].resources.stone}`,
+  );
+  check("the tower actually healed", tower.hp > Math.floor(def.hp * 0.4), `hp=${tower.hp}`);
+}
+
 console.log(pass ? "STONE: PASS ✅" : "STONE: FAIL ❌");
 process.exit(pass ? 0 : 1);

@@ -126,7 +126,9 @@ const a = runBattle();
 const b = runBattle();
 check("battle is internally reproducible", a === b, `a=${a} b=${b}`);
 
-const EXPECTED = 1439965385; // baked from the sim with the damage path extracted (stage 1)
+const EXPECTED = 3335923997; // re-baked after adding skirmisher kiting (#2): the
+// attack-moving archers now reposition while engaged, so the battle resolves
+// differently. Still fully reproducible run-to-run (the guard above proves it).
 check("battle hash matches the pre-refactor baseline", a === EXPECTED, `got=${a} expected=${EXPECTED}`);
 
 console.log(pass ? "COMBAT-DETERMINISM: PASS ✅" : "COMBAT-DETERMINISM: FAIL ❌");

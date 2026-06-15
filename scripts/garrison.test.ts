@@ -193,6 +193,27 @@ const garrisonOf = (b: Building) => b.garrison ?? [];
   check("garrisoned archers add arrows (more damage)", boosted > base, `${boosted} vs ${base}`);
 }
 
+// ---- 5b. garrisoned archers shoot with the owner's attack upgrades ----------
+{
+  // The same sheltered archers should hit harder when the owner has researched an
+  // attack upgrade — garrison arrows use unitDamage, not the raw base.
+  function damageWithUpgrade(upgrades: string[]): number {
+    const { world, fog, template, cx, cy } = arena();
+    world.players[0].upgrades = upgrades as never;
+    const tc = addBuilding(world, 0, "town_center", cx, cy);
+    const a = placeUnit(world, template, 0, "archer", cx + 1.5, cy + 1.5);
+    world.units = world.units.filter((u) => u.id !== a.id);
+    (tc.garrison ??= []).push(a);
+    const foe = placeUnit(world, template, 1, "cavalry", cx + 0.5, cy + 3.5);
+    const hp0 = foe.hp;
+    for (let i = 0; i < 20; i++) tick(world, fog);
+    return hp0 - foe.hp;
+  }
+  const plain = damageWithUpgrade([]);
+  const teched = damageWithUpgrade(["sharpenedBlades"]);
+  check("attack upgrades boost garrison arrows", teched > plain, `${teched} vs ${plain}`);
+}
+
 // ---- 6. eject returns the garrison to the map ------------------------------
 {
   const { world, fog, template, cx, cy } = arena();
