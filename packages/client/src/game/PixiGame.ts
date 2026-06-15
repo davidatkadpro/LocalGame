@@ -1,7 +1,7 @@
 // PixiJS renderer + camera + input for the in-match view.
 // Reads interpolated snapshots from the store and sends commands back.
 
-import { Application, Container, Graphics, Sprite } from "pixi.js";
+import { Application, Container, Graphics, RenderTexture, Sprite } from "pixi.js";
 import {
   ANIMAL_DEFS,
   BUILDING_DEFS,
@@ -69,7 +69,13 @@ export class PixiGame {
   private app = new Application();
   private world = new Container();
   private terrainLayer = new Graphics();
-  private fogLayer = new Graphics();
+  // Fog is rendered into a low-res texture (one texel per tile) and stretched
+  // over the map; bilinear upscaling feathers the tile edges so the shroud reads
+  // as a soft gradient instead of a hard black checkerboard. `fogScratch` is the
+  // reused Graphics we draw the per-tile alphas into before baking to `fogTex`.
+  private fogSprite = new Sprite();
+  private fogTex: RenderTexture | null = null;
+  private fogScratch = new Graphics();
   private resourceLayer = new Container();
   // §7.10 relics: neutral capturable monuments + an owner-coloured ring.
   private relicLayer = new Container();
@@ -178,7 +184,7 @@ export class PixiGame {
       this.entityLayer,
       this.projLayer,
       this.hpLayer,
-      this.fogLayer,
+      this.fogSprite,
       this.boxLayer,
       this.placeLayer,
     );
@@ -204,6 +210,8 @@ export class PixiGame {
     this.destroyed = true;
     this.clearLongPress();
     if (this.onKeyDown) window.removeEventListener("keydown", this.onKeyDown);
+    this.fogTex?.destroy(true);
+    this.fogTex = null;
     this.app.destroy(true, { children: true });
   }
 
@@ -1210,19 +1218,35 @@ export class PixiGame {
     if (!this.map) return;
     const vis = base64ToBytes(snap.visible);
     const exp = base64ToBytes(snap.explored);
-    const g = this.fogLayer;
-    g.clear();
     const w = this.map.width;
-    for (let y = 0; y < this.map.height; y++) {
+    const h = this.map.height;
+
+    // (Re)create the one-texel-per-tile fog texture; linear sampling on upscale is
+    // what feathers the tile edges into a smooth gradient.
+    if (!this.fogTex) {
+      this.fogTex = RenderTexture.create({ width: w, height: h });
+      this.fogTex.source.scaleMode = "linear";
+    }
+
+    // Paint the shroud as per-tile alpha (the texel's darkness): unexplored fully
+    // black, explored-but-not-visible dimmed, visible clear.
+    const g = this.fogScratch;
+    g.clear();
+    for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const i = y * w + x;
-        if (exp[i] !== 1) {
-          g.rect(x, y, 1, 1).fill({ color: 0x000000, alpha: 1 });
-        } else if (vis[i] !== 1) {
-          g.rect(x, y, 1, 1).fill({ color: 0x000000, alpha: 0.45 });
-        }
+        const a = exp[i] !== 1 ? 1 : vis[i] !== 1 ? 0.45 : 0;
+        if (a > 0) g.rect(x, y, 1, 1).fill({ color: 0x000000, alpha: a });
       }
     }
+    this.app.renderer.render({ container: g, target: this.fogTex, clear: true });
+
+    // Stretch the baked texture over the whole map; the world container's
+    // TILE×zoom scale turns these map-tile units into screen pixels.
+    this.fogSprite.texture = this.fogTex;
+    this.fogSprite.position.set(0, 0);
+    this.fogSprite.width = w;
+    this.fogSprite.height = h;
   }
 
   // ----------------------------------------------------------- input
