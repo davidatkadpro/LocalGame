@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- A felled tree's leftover stump (neutral; no team colour). -->
+  <defs>
+    <linearGradient id="stumpBark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a5a2b"/>
+      <stop offset="1" stop-color="#5e3c1c"/>
+    </linearGradient>
+    <radialGradient id="stumpTop" cx="0.42" cy="0.4" r="0.75">
+      <stop offset="0" stop-color="#c79a5e"/>
+      <stop offset="1" stop-color="#9a6a36"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="78" rx="22" ry="6" fill="#000000" opacity="0.18"/>
+  <!-- bark sides -->
+  <path d="M30 58 L30 70 Q50 82 70 70 L70 58 Z" fill="url(#stumpBark)"/>
+  <!-- cut surface -->
+  <ellipse cx="50" cy="58" rx="20" ry="9" fill="url(#stumpTop)"/>
+  <!-- growth rings -->
+  <ellipse cx="50" cy="58" rx="13" ry="5.6" fill="none" stroke="#7a5128" stroke-width="1.6" opacity="0.55"/>
+  <ellipse cx="50" cy="58" rx="6.5" ry="2.8" fill="none" stroke="#7a5128" stroke-width="1.4" opacity="0.5"/>
+  <ellipse cx="50" cy="57.6" rx="2" ry="1" fill="#6e4420" opacity="0.6"/>
+  <!-- a small cut highlight -->
+  <ellipse cx="44" cy="55" rx="4" ry="1.8" fill="#e6c590" opacity="0.4"/>
+</svg>

@@ -90,6 +90,11 @@ export class PixiGame {
   // the draw culls to the viewport so cost scales with screen size, not map size.
   private waterLayer = new Graphics();
   private waterTiles: { x: number; y: number }[] = [];
+  // Felled-tree stumps: a wood node only leaves the snapshot once chopped out
+  // (resources are gated on the *explored* mask, which never reverts), so when a
+  // tracked wood node disappears we leave a permanent stump where it stood.
+  private stumpLayer = new Container();
+  private woodNodes = new Map<number, { x: number; y: number }>();
   // Fog is rendered into a low-res texture (one texel per tile) and stretched
   // over the map; bilinear upscaling feathers the tile edges so the shroud reads
   // as a soft gradient instead of a hard black checkerboard. `fogScratch` is the
@@ -203,6 +208,7 @@ export class PixiGame {
     this.world.addChild(
       this.terrainLayer,
       this.waterLayer,
+      this.stumpLayer,
       this.resourceLayer,
       this.relicLayer,
       this.selectionLayer,
@@ -929,6 +935,8 @@ export class PixiGame {
         this.resourceSprites.set(n.id, sp);
       }
       sp.position.set(n.tx + 0.5, n.ty + 0.5);
+      // Remember live wood nodes so we can leave a stump if one is chopped out.
+      if (n.kind === "wood" && !n.carcass) this.woodNodes.set(n.id, { x: n.tx + 0.5, y: n.ty + 0.5 });
 
       // Shrink + fade a node as it's mined out, so a patch running low reads at a
       // glance. The "full" size is the largest amount we've ever seen for it
@@ -948,11 +956,28 @@ export class PixiGame {
     }
     for (const [id, sp] of this.resourceSprites) {
       if (!seen.has(id)) {
+        // A wood node that vanished was chopped to nothing (explored tiles never
+        // re-fog) — leave a stump where the tree stood.
+        const wood = this.woodNodes.get(id);
+        if (wood) {
+          this.spawnStump(wood.x, wood.y);
+          this.woodNodes.delete(id);
+        }
         sp.destroy();
         this.resourceSprites.delete(id);
         this.resourceMax.delete(id);
       }
     }
+  }
+
+  /** Drop a permanent felled-tree stump at a world point (a depleted wood node). */
+  private spawnStump(x: number, y: number): void {
+    const sp = new Sprite(textures.stump);
+    sp.anchor.set(0.5);
+    sp.width = 0.6;
+    sp.height = 0.6;
+    sp.position.set(x, y);
+    this.stumpLayer.addChild(sp);
   }
 
   /** §7.10 Relics: a sprite per relic plus a ring — the holder's colour when

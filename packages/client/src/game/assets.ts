@@ -29,6 +29,7 @@ import siegeWorkshopUrl from "../assets/siege_workshop.svg";
 import wonderUrl from "../assets/wonder.svg";
 import relicUrl from "../assets/relic.svg";
 import treeUrl from "../assets/tree.svg";
+import stumpUrl from "../assets/stump.svg";
 import goldUrl from "../assets/gold.svg";
 import stoneUrl from "../assets/stone.svg";
 import foodUrl from "../assets/food.svg";
@@ -91,6 +92,7 @@ export type SpriteKey =
   | "wonder"
   | "relic"
   | "tree"
+  | "stump"
   | "gold"
   | "stone"
   | "food"
@@ -154,6 +156,7 @@ const URLS: Record<SpriteKey, string> = {
   wonder: wonderUrl,
   relic: relicUrl,
   tree: treeUrl,
+  stump: stumpUrl,
   gold: goldUrl,
   stone: stoneUrl,
   food: foodUrl,
