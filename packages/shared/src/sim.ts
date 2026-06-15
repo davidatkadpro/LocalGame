@@ -739,14 +739,27 @@ function repathForMove(world: World, u: Unit): Vec2[] {
   return [];
 }
 
+/** What a target-acquisition scan looks for: how far, and whether buildings
+ *  count when no enemy unit is in range. */
+interface AcquireParams {
+  /** search radius — a unit's sight for seek/leashed engagements, its attack
+   *  range for stand-ground (fire only on what's already within reach). */
+  radius: number;
+  /** when no enemy unit is in range, fall back to the nearest enemy building. */
+  includeBuildings: boolean;
+}
+
 /**
- * Find the nearest enemy unit (preferred) or building within this unit's sight
- * radius, for attack-move target acquisition. Returns its entity id, or null.
+ * Nearest enemy within `radius`: prefer the nearest enemy *unit*, falling back to
+ * the nearest enemy *building* only when `includeBuildings` and no unit qualifies.
+ * One scan, parameterised by stance/leash — attack-move acquisition, aggressive
+ * seek, the post-kill swing, and stand-ground all call this instead of each
+ * hand-rolling its own loop. Ties break by iteration order (nearest-then-id),
+ * kept byte-identical so the sim stays replay-deterministic.
  */
-function acquireTarget(world: World, u: Unit): EntityId | null {
-  const sight = UNIT_DEFS[u.type].sight;
+function acquireTarget(world: World, u: Unit, params: AcquireParams): EntityId | null {
   let best: EntityId | null = null;
-  let bestD = sight;
+  let bestD = params.radius;
   for (const e of world.units) {
     if (sameTeam(world, e.owner, u.owner) || e.hp <= 0) continue;
     const d = dist(u.pos, e.pos);
@@ -756,8 +769,9 @@ function acquireTarget(world: World, u: Unit): EntityId | null {
     }
   }
   if (best !== null) return best;
+  if (!params.includeBuildings) return null;
   // no enemy units in range — look for an enemy building
-  bestD = sight;
+  bestD = params.radius;
   for (const b of world.buildings) {
     if (sameTeam(world, b.owner, u.owner)) continue;
     const d = distToBuilding(u.pos, b);
@@ -769,21 +783,10 @@ function acquireTarget(world: World, u: Unit): EntityId | null {
   return best;
 }
 
-/** Nearest enemy *unit* (not building) within this unit's sight, or null. Used
- *  to keep a player-issued attacker swinging onto the next foe after a kill. */
-function nearestEnemyUnit(world: World, u: Unit): EntityId | null {
-  const sight = UNIT_DEFS[u.type].sight;
-  let best: EntityId | null = null;
-  let bestD = sight;
-  for (const e of world.units) {
-    if (sameTeam(world, e.owner, u.owner) || e.hp <= 0) continue;
-    const d = dist(u.pos, e.pos);
-    if (d < bestD) {
-      bestD = d;
-      best = e.id;
-    }
-  }
-  return best;
+/** The common case: acquire within sight, considering enemy buildings — used for
+ *  attack-move and aggressive-stance seek. */
+function acquireInSight(world: World, u: Unit): EntityId | null {
+  return acquireTarget(world, u, { radius: UNIT_DEFS[u.type].sight, includeBuildings: true });
 }
 
 const ANIMAL_WANDER_MIN = 18; // ticks on a heading before re-rolling
@@ -1196,7 +1199,7 @@ function updateUnit(world: World, u: Unit): void {
     case "moving": {
       // Attack-move: engage any enemy that comes into sight while travelling.
       if (u.aggro) {
-        const tid = acquireTarget(world, u);
+        const tid = acquireInSight(world, u);
         if (tid !== null) {
           u.targetEntity = tid;
           u.state = "attacking";
@@ -1660,7 +1663,9 @@ function doAttack(world: World, u: Unit): void {
     // sight so a melee scrum doesn't stall after each kill. Bounded to sight, so
     // it falls idle once no foes remain nearby.
     if (!isRetaliation(u)) {
-      const next = nearestEnemyUnit(world, u);
+      // Swing onto the next enemy *unit* in sight (no buildings — don't wander
+      // off to siege a structure after a melee kill).
+      const next = acquireTarget(world, u, { radius: UNIT_DEFS[u.type].sight, includeBuildings: false });
       if (next !== null) {
         u.targetEntity = next;
         u.state = "attacking";
@@ -1759,7 +1764,7 @@ function doAttack(world: World, u: Unit): void {
  */
 function resumeAggro(world: World, u: Unit): boolean {
   if (!u.aggro) return false;
-  const next = acquireTarget(world, u);
+  const next = acquireInSight(world, u);
   if (next !== null) {
     u.targetEntity = next;
     u.state = "attacking";
@@ -1806,7 +1811,7 @@ function tryRetaliate(world: World, u: Unit): void {
  * true if a target was acquired.
  */
 function tryAcquireAggressive(world: World, u: Unit): boolean {
-  const tid = acquireTarget(world, u);
+  const tid = acquireInSight(world, u);
   if (tid === null) return false;
   u.targetEntity = tid;
   u.state = "attacking";
@@ -1822,17 +1827,9 @@ function tryAcquireAggressive(world: World, u: Unit): boolean {
  * moment the target steps out of range.
  */
 function tryStandGround(world: World, u: Unit): void {
-  const def = UNIT_DEFS[u.type];
-  let best: EntityId | null = null;
-  let bd = def.range;
-  for (const e of world.units) {
-    if (e.id === u.id || e.hp <= 0 || sameTeam(world, e.owner, u.owner)) continue;
-    const d = dist(u.pos, e.pos);
-    if (d < bd) {
-      bd = d;
-      best = e.id;
-    }
-  }
+  // Only enemies *already* within attack range, and never buildings — hold the
+  // line, don't take a step. (Self is excluded by the same-team test.)
+  const best = acquireTarget(world, u, { radius: UNIT_DEFS[u.type].range, includeBuildings: false });
   if (best === null) return;
   u.targetEntity = best;
   u.state = "attacking";
