@@ -192,10 +192,18 @@ export function accentKey(type: string): SpriteKey | null {
 
 export const textures = {} as Record<SpriteKey, Texture>;
 
+// SVGs rasterise at their intrinsic 100×100 by default, so a 3×3 building scaled
+// up to 100–300+ on-screen px (more on retina / when zoomed in) looks blurry.
+// Rasterise at 4× (→ 400×400, well under Pixi's 4096 texture limit) for crisp
+// edges. Tunable — higher is sharper but costs more texture memory. Sizing is
+// unaffected: the texture still reports its logical 100×100, so all the
+// tile-unit width/anchor maths (and the team-colour accent alignment) hold.
+const SVG_RES = 4;
+
 export async function loadAssets(): Promise<void> {
   await Promise.all(
     (Object.keys(URLS) as SpriteKey[]).map(async (key) => {
-      textures[key] = await Assets.load(URLS[key]);
+      textures[key] = await Assets.load({ src: URLS[key], data: { resolution: SVG_RES } });
     }),
   );
 }
