@@ -19,10 +19,8 @@ import {
   UPGRADE_DEFS,
   campBonusFor,
   canAfford,
-  damageMultiplier,
   emptyResources,
   gatherRate,
-  incomingDamage,
   isWall,
   minAgeOfBuilding,
   minAgeOfUnit,
@@ -31,6 +29,7 @@ import {
   payCost,
   unitDamage,
 } from "./constants";
+import { applyDamage, damageBuilding } from "./combat";
 import { Fog, updateVision } from "./fog";
 import { dist, inBounds, rectContains } from "./geometry";
 import { generateMap } from "./map";
@@ -78,7 +77,6 @@ const ARRIVE_EPS = 0.06;
 // standing diagonally-adjacent to a node tucked under a building (a farm's
 // hosted food node) still counts as in reach.
 const REACH_DIST = 1.5;
-const RETALIATE_TTL_MS = 4000; // how long an idle unit remembers who hit it
 const REPAIR_HP_PER_SEC = 20; // hp a worker restores per second when repairing
 const REPAIR_COST_RATIO = 0.5; // repairing 0 -> full costs half the build cost
 
@@ -1036,7 +1034,9 @@ function tickTowers(world: World): void {
     for (let i = 0; i < 1 + archers; i++) {
       const t = foes[i % foes.length].u;
       const dmg = i === 0 ? def.attack.damage : UNIT_DEFS.archer.damage;
-      t.hp -= incomingDamage(world.players[t.owner], t.type, dmg);
+      // A tower shot has no counter table and never makes the victim retaliate
+      // (you can't fight back against a building), so no attacker/source is passed.
+      applyDamage(world, t, dmg);
     }
     b.attackCooldown = def.attack.attackMs;
   }
@@ -1734,11 +1734,8 @@ function doAttack(world: World, u: Unit): void {
   if (u.attackCooldown <= 0) {
     const dmg = unitDamage(world.players[u.owner], u.type);
     if (targetUnit) {
-      const dealt = dmg * damageMultiplier(u.type, targetUnit.type);
-      targetUnit.hp -= incomingDamage(world.players[targetUnit.owner], targetUnit.type, dealt);
-      // Remember the attacker so an idle victim fights back (auto-retaliation).
-      targetUnit.attackedBy = u.id;
-      targetUnit.attackedTtl = RETALIATE_TTL_MS;
+      // The hit stamps `attackedBy` so an idle victim fights back (auto-retaliation).
+      applyDamage(world, targetUnit, dmg, { attackerType: u.type, sourceId: u.id });
       // §7.7 siege splash: a mangonel also damages every other enemy unit bunched
       // around the impact, punishing massed (e.g. archer) formations. Enemies
       // only — no friendly fire — keeping it deterministic and un-griefable.
@@ -1747,13 +1744,10 @@ function doAttack(world: World, u: Unit): void {
           if (e.id === targetUnit.id || e.hp <= 0) continue;
           if (sameTeam(world, e.owner, u.owner)) continue;
           if (dist(e.pos, targetUnit.pos) > def.splashRadius) continue;
-          const sd = dmg * damageMultiplier(u.type, e.type);
-          e.hp -= incomingDamage(world.players[e.owner], e.type, sd);
-          e.attackedBy = u.id;
-          e.attackedTtl = RETALIATE_TTL_MS;
+          applyDamage(world, e, dmg, { attackerType: u.type, sourceId: u.id });
         }
       }
-    } else if (targetBuilding) targetBuilding.hp -= dmg * damageMultiplier(u.type, "building");
+    } else if (targetBuilding) damageBuilding(targetBuilding, dmg, u.type);
     u.attackCooldown = def.attackMs;
   }
 }

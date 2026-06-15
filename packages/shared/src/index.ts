@@ -5,6 +5,7 @@ export * from "./rng";
 export * from "./geometry";
 export * from "./map";
 export * from "./placement";
+export * from "./combat";
 export * from "./intent";
 export * from "./pathfinding";
 export * from "./fog";
