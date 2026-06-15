@@ -1,7 +1,7 @@
 // PixiJS renderer + camera + input for the in-match view.
 // Reads interpolated snapshots from the store and sends commands back.
 
-import { Application, Container, Graphics, RenderTexture, Sprite } from "pixi.js";
+import { Application, Container, Graphics, RenderTexture, Sprite, Texture } from "pixi.js";
 import {
   ANIMAL_DEFS,
   BUILDING_DEFS,
@@ -45,6 +45,22 @@ function shade(hex: number, f: number): number {
   const g = clamp255(((hex >> 8) & 255) * (1 + f));
   const b = clamp255((hex & 255) * (1 + f));
   return (r << 16) | (g << 8) | b;
+}
+
+/** A square radial-gradient texture (transparent centre → dark edge) used as the
+ *  screen vignette. Built once from an offscreen canvas so it works on any
+ *  renderer backend without relying on Pixi's gradient-fill specifics. */
+function makeVignetteTexture(): Texture {
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const ctx = c.getContext("2d")!;
+  const grad = ctx.createRadialGradient(128, 128, 70, 128, 128, 185);
+  grad.addColorStop(0, "rgba(0,0,0,0)");
+  grad.addColorStop(0.7, "rgba(0,0,0,0)");
+  grad.addColorStop(1, "rgba(0,0,0,0.42)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 256, 256);
+  return Texture.from(c);
 }
 
 /** Deterministic per-tile pseudo-noise in [0,1) — stable across redraws. */
@@ -94,6 +110,9 @@ export class PixiGame {
   private hpLayer = new Graphics();
   private boxLayer = new Graphics();
   private placeLayer = new Graphics();
+  // Screen-space vignette: a soft darkening at the frame edges that focuses the
+  // eye on the centre. Lives on the stage (not the world), so it never pans/zooms.
+  private vignette = new Sprite();
 
   private map: GameMap | null = null;
   private cam = { x: 0, y: 0, zoom: 1 };
@@ -195,6 +214,12 @@ export class PixiGame {
       this.placeLayer,
     );
     this.app.stage.addChild(this.world);
+
+    // Vignette overlay on top, fixed to the screen. A square radial-gradient
+    // texture stretched to the viewport gives an aspect-matched edge darkening.
+    this.vignette.texture = makeVignetteTexture();
+    this.vignette.eventMode = "none"; // never intercept (input is DOM-based anyway)
+    this.app.stage.addChild(this.vignette);
 
     const { map, players, myPlayerId } = useStore.getState();
     this.map = map;
@@ -473,6 +498,10 @@ export class PixiGame {
 
     this.now = performance.now();
     this.drawWater();
+    // Stretch the vignette to the current viewport (css px; stage is autoDensity).
+    const dpr = window.devicePixelRatio || 1;
+    this.vignette.width = this.app.renderer.width / dpr;
+    this.vignette.height = this.app.renderer.height / dpr;
 
     const st = useStore.getState();
     if (!st.curr) return;
