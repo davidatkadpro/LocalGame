@@ -828,6 +828,9 @@ export class PixiGame {
       const cx = b.tx + def.size.w / 2;
       const cy = b.ty + def.size.h / 2;
       sp.alpha = 0.45 + 0.55 * b.progress;
+      // Fog "ghost": a remembered enemy building no-one currently sees. Draw it
+      // faint so it reads as last-known intel, not a live structure.
+      if (b.stale) sp.alpha *= 0.4;
       sp.position.set(cx, cy);
       sp.zIndex = b.ty + def.size.h; // sort by bottom edge
 
@@ -875,7 +878,7 @@ export class PixiGame {
       // enemy *of their owner* in range — any building with an attack def, not
       // just towers. The shot is cosmetic; the sim decides the real hits.
       const atk = def.attack;
-      if (atk && b.progress >= 1) {
+      if (atk && b.progress >= 1 && !b.stale) {
         const e = this.nearestEnemy(cx, cy, curr, atk.range, b.owner);
         if (e) this.emitShot(b.id, cx, cy - 0.6, e.x, e.y, atk.attackMs);
       }
@@ -1269,6 +1272,7 @@ export class PixiGame {
       bar(sp.x, sp.y - 0.62, 0.8, u.hp / max);
     }
     for (const b of snap.buildings) {
+      if (b.stale) continue; // ghost: don't show a stale (last-seen) health bar
       const def = BUILDING_DEFS[b.type as BuildingType];
       const ratio = b.hp / def.hp;
       if (ratio >= 1 && b.progress >= 1) continue;

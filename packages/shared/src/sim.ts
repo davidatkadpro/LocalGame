@@ -27,7 +27,7 @@ import {
   unitDamage,
 } from "./constants";
 import { applyDamage, damageBuilding } from "./combat";
-import { Fog, updateVision } from "./fog";
+import { Fog, type RememberedBuilding, updateBuildingMemory, updateVision } from "./fog";
 import { dist, inBounds, rectContains } from "./geometry";
 import { generateMap } from "./map";
 import { canPlaceBuilding } from "./placement";
@@ -921,6 +921,7 @@ export function tick(world: World, fog: Fog): void {
   recomputePop(world);
   updateWinState(world);
   updateVision(world, fog);
+  updateBuildingMemory(world, fog); // refresh each player's last-seen enemy buildings
 }
 
 /** A gatherable node sitting on tile (x,y) for `owner`: neutral (any non-empty)
@@ -1827,6 +1828,11 @@ function orMasks(
   return out;
 }
 
+/** A remembered enemy building as a fog "ghost" DTO (flagged `stale`). */
+function rememberedFor(g: RememberedBuilding): BuildingDTO {
+  return { id: g.id, owner: g.owner, type: g.type, tx: g.tx, ty: g.ty, hp: g.hp, progress: g.progress, stale: true };
+}
+
 export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
   const me = world.players[player];
   const w = world.map.width;
@@ -1908,6 +1914,23 @@ export function viewFor(world: World, fog: Fog, player: PlayerId): Snapshot {
       }
       return dto;
     });
+
+  // Fog memory (§7): append "ghosts" of enemy buildings a teammate has scouted but
+  // no-one currently sees — their last-seen state, so a known base stays on the map
+  // until re-seen. Skipped while spectating (everything is already live-revealed).
+  if (!reveal) {
+    const shown = new Set(buildings.map((b) => b.id));
+    const ghosts = new Map<EntityId, ReturnType<typeof rememberedFor>>();
+    for (const mate of mates) {
+      const mem = fog.buildings.get(mate);
+      if (!mem) continue;
+      for (const [id, g] of mem) if (!shown.has(id)) ghosts.set(id, rememberedFor(g));
+    }
+    for (const g of ghosts.values()) {
+      buildings.push(g);
+      shown.add(g.id);
+    }
+  }
 
   const resources = world.resourceNodes
     .filter((n) => reveal || expTile(n.tile.x, n.tile.y))

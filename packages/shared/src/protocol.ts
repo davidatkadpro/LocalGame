@@ -72,6 +72,9 @@ export interface BuildingDTO {
   ty: number;
   hp: number;
   progress: number;
+  /** true for a *remembered* enemy building shown in fog — its last-seen state,
+   *  not live. The client renders these as faded "ghosts" (§7 fog memory). */
+  stale?: boolean;
   // The following are only populated for the viewing player's own buildings.
   queue?: UnitType[];
   produceTimer?: number; // ms left on the unit currently producing
