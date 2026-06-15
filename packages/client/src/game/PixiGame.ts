@@ -1115,13 +1115,21 @@ export class PixiGame {
     this.projectiles = this.projectiles.filter((p) => this.now - p.born < p.dur);
     for (const p of this.projectiles) {
       const prog = (this.now - p.born) / p.dur;
-      const cx = p.x + (p.tx - p.x) * prog;
-      const cy = p.y + (p.ty - p.y) * prog;
       const dx = p.tx - p.x;
       const dy = p.ty - p.y;
       const len = Math.hypot(dx, dy) || 1;
-      const ux = dx / len;
-      const uy = dy / len;
+      // Lob the arrow on a parabola: lifted up (−y), peaking at mid-flight, with
+      // more loft on longer shots. The head follows the arc's tangent, not the
+      // straight line, so the trail reads as a real ballistic curve.
+      const lift = Math.min(1.1, 0.16 * len);
+      const arc = lift * 4 * prog * (1 - prog);
+      const cx = p.x + dx * prog;
+      const cy = p.y + dy * prog - arc;
+      const vx = dx;
+      const vy = dy - lift * 4 * (1 - 2 * prog); // d(arc-adjusted y)/d(prog)
+      const vlen = Math.hypot(vx, vy) || 1;
+      const ux = vx / vlen;
+      const uy = vy / vlen;
       g.moveTo(cx - ux * 0.28, cy - uy * 0.28)
         .lineTo(cx, cy)
         .stroke({ width: 0.07, color: 0xffe9a8, alpha: 0.95 });
