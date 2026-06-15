@@ -368,6 +368,15 @@ export class PixiGame {
   private drawTerrain(map: GameMap): void {
     const g = this.terrainLayer;
     g.clear();
+    const tileAt = (x: number, y: number): Terrain | null =>
+      x < 0 || y < 0 || x >= map.width || y >= map.height ? null : map.tiles[y * map.width + x];
+    // 4-neighbour offsets, paired with the inset edge band they share with us.
+    const DIRS: { dx: number; dy: number; ex: number; ey: number; ew: number; eh: number }[] = [
+      { dx: 0, dy: -1, ex: 0, ey: 0, ew: 1, eh: 0.14 }, // N
+      { dx: 1, dy: 0, ex: 0.86, ey: 0, ew: 0.14, eh: 1 }, // E
+      { dx: 0, dy: 1, ex: 0, ey: 0.86, ew: 1, eh: 0.14 }, // S
+      { dx: -1, dy: 0, ex: 0, ey: 0, ew: 0.14, eh: 1 }, // W
+    ];
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         const t = map.tiles[y * map.width + x];
@@ -382,6 +391,29 @@ export class PixiGame {
           const fy = y + 0.2 + 0.6 * tileNoise(x + 71, y + 29);
           const fleck = t === "water" ? shade(base, 0.18) : shade(base, -0.18);
           g.circle(fx, fy, 0.075).fill({ color: fleck, alpha: 0.5 });
+        }
+
+        // Soften biome seams: where a neighbour is a different terrain, interlock
+        // the boundary with the neighbour's colour bleeding a little into our
+        // edge, and lay a sandy shore band wherever land meets water. All inset
+        // within this tile, so draw order with neighbours doesn't matter.
+        for (let d = 0; d < DIRS.length; d++) {
+          const dir = DIRS[d];
+          const nb = tileAt(x + dir.dx, y + dir.dy);
+          if (nb === null || nb === t) continue;
+          if (t !== "water" && nb === "water") {
+            // coastline: a thin warm-sand fringe along the water's edge
+            g.rect(x + dir.ex, y + dir.ey, dir.ew, dir.eh).fill({ color: 0xcdbb88, alpha: 0.35 });
+            continue;
+          }
+          // generic seam: a few deterministic flecks of the neighbour's colour
+          const nCol = shade(TERRAIN_COLOR[nb], -0.1);
+          for (let i = 0; i < 3; i++) {
+            const s = tileNoise(x * 7 + i + d * 31, y * 7 + i * 13 + d * 17);
+            const fx = x + dir.ex + tileNoise(x + i, y + d) * dir.ew;
+            const fy = y + dir.ey + tileNoise(y + i, x + d) * dir.eh;
+            g.circle(fx, fy, 0.05 + 0.03 * s).fill({ color: nCol, alpha: 0.4 });
+          }
         }
       }
     }
