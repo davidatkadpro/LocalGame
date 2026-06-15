@@ -69,6 +69,11 @@ export class PixiGame {
   private app = new Application();
   private world = new Container();
   private terrainLayer = new Graphics();
+  // Animated shimmer drawn over water tiles each frame (terrain itself is baked
+  // once and static). `waterTiles` is the water tile list, built with the terrain;
+  // the draw culls to the viewport so cost scales with screen size, not map size.
+  private waterLayer = new Graphics();
+  private waterTiles: { x: number; y: number }[] = [];
   // Fog is rendered into a low-res texture (one texel per tile) and stretched
   // over the map; bilinear upscaling feathers the tile edges so the shroud reads
   // as a soft gradient instead of a hard black checkerboard. `fogScratch` is the
@@ -178,6 +183,7 @@ export class PixiGame {
     this.relicLayer.addChild(this.relicRings); // rings render under the relic sprites
     this.world.addChild(
       this.terrainLayer,
+      this.waterLayer,
       this.resourceLayer,
       this.relicLayer,
       this.selectionLayer,
@@ -368,6 +374,7 @@ export class PixiGame {
   private drawTerrain(map: GameMap): void {
     const g = this.terrainLayer;
     g.clear();
+    this.waterTiles = [];
     const tileAt = (x: number, y: number): Terrain | null =>
       x < 0 || y < 0 || x >= map.width || y >= map.height ? null : map.tiles[y * map.width + x];
     // 4-neighbour offsets, paired with the inset edge band they share with us.
@@ -381,6 +388,7 @@ export class PixiGame {
       for (let x = 0; x < map.width; x++) {
         const t = map.tiles[y * map.width + x];
         const base = TERRAIN_COLOR[t];
+        if (t === "water") this.waterTiles.push({ x, y });
         // per-tile brightness variation breaks up the flat colour slabs
         const n = tileNoise(x, y);
         g.rect(x, y, 1, 1).fill(shade(base, (n - 0.5) * 0.22));
@@ -419,6 +427,34 @@ export class PixiGame {
     }
   }
 
+  /** Per-frame water shimmer: a drifting highlight dash on each visible water
+   *  tile, its brightness rolling on a per-tile-phased sine so the surface looks
+   *  alive. Culled to the viewport (plus a margin) so the cost tracks screen size
+   *  rather than the whole map. Sits under resources/units, over the baked terrain. */
+  private drawWater(): void {
+    const g = this.waterLayer;
+    g.clear();
+    if (this.waterTiles.length === 0) return;
+    const vp = this.getViewport();
+    const m = 1; // tiles of slack around the visible area
+    const minX = vp.x - vp.w / 2 - m;
+    const maxX = vp.x + vp.w / 2 + m;
+    const minY = vp.y - vp.h / 2 - m;
+    const maxY = vp.y + vp.h / 2 + m;
+    const tt = this.now / 1000;
+    for (const { x, y } of this.waterTiles) {
+      if (x < minX || x > maxX || y < minY || y > maxY) continue;
+      const phase = (x * 0.7 + y * 1.3) % (Math.PI * 2);
+      const wave = 0.5 + 0.5 * Math.sin(tt * 1.6 + phase);
+      // a short horizontal crest that drifts slightly across the tile
+      const drift = 0.12 * Math.sin(tt * 0.9 + phase);
+      const cy = y + 0.5 + 0.12 * Math.sin(tt * 1.2 + phase * 1.7);
+      g.moveTo(x + 0.22 + drift, cy)
+        .lineTo(x + 0.62 + drift, cy)
+        .stroke({ width: 0.06, color: 0xbfe3ff, alpha: 0.08 + 0.16 * wave });
+    }
+  }
+
   // ----------------------------------------------------------- per-frame
 
   private frame(): void {
@@ -436,6 +472,7 @@ export class PixiGame {
     this.applyCamera();
 
     this.now = performance.now();
+    this.drawWater();
 
     const st = useStore.getState();
     if (!st.curr) return;
